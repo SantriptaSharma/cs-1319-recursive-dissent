@@ -1,0 +1,9 @@
+# config
+.vscode/
+
+# generated files
+*.exe
+parser.c
+
+# redundant files
+*_old.*
