@@ -9,8 +9,6 @@
 #define STRLIT 13
 #define PUNCT 14
 
-#define yywrap() 1
-
 // typedef struct {
 // 	int id;
 // 	const char *lexeme;
@@ -61,8 +59,7 @@
 // void display(const Token t) {
 // 	printf("<%s, %s>, ", token_names[t.id], t.lexeme);
 // }
-// [S|^S]
-
+// [S|^S]  // 
 %}
 
 KEYWORD char|else|for|if|int|return|void
@@ -76,6 +73,7 @@ STRLIT \"{STRCHAR}*\"
 COMMENTSINGLE \/\/([^\n])*\n
 COMMENTMULTI \/\*(.|[\s\n])*\*\/
 
+
 %%
 {KEYWORD} {printf("<KEYWORD, %s>, ", yytext); return 1; }
 {IDENT} {printf("<IDENT, %s>," , yytext); return 1;}
@@ -85,4 +83,7 @@ COMMENTMULTI \/\*(.|[\s\n])*\*\/
 {COMMENTSINGLE}|{COMMENTMULTI} {return 1;}
 
 [\s\n\t]* { return 1; }
+
 %%
+
+int yywrap() { return 1; }
