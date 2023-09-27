@@ -3,7 +3,7 @@ int b = 0213;
 int c = -123;
 int d = -00045; //invalid actually
 
-int -valididentifier- = +1;
+int _valididentifier_ = +1;
 
 
 if (name1 == "3454\n") {
@@ -25,12 +25,12 @@ void identifierguy(int x = -31) {
 }
 
 // wdsadwaw
+"weirdo stringliteral /*hopefully not a comment*/ \n \n \n \n "
 
 /* error/* error 2
 multiline error		
 */ 1*/
 
-"weirdo stringliteral /*hopefully not a comment*/ \n \n \n \n "
 
 /*pioqwepoiqew*/ asdipoi 
 a /*new lined comment???*/

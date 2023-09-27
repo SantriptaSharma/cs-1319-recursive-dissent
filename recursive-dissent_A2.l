@@ -63,7 +63,7 @@
 %}
 
 KEYWORD char|else|for|if|int|return|void
-IDENT [a-zA-Z-][0-9a-zA-Z-]*
+IDENT [a-zA-Z\_][0-9a-zA-Z\_]*
 PUNCT \[|\]|\(|\)|\{|\}|->|&|\*|\+|-|\/|%|!|\?|\<|\>|<=|>=|==|!=|&&|\\|\||=|:|;|,
 ESCAPE \\'|\\\?|\\\"|\\\\|\\a|\\b|\\f|\\n|\\r|\\t|\\v
 CHAR [^\\'\n]|{ESCAPE}
