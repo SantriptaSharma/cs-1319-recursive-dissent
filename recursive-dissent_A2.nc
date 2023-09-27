@@ -37,3 +37,4 @@ a /*new lined comment???*/
 works hopefully these are idents*/
 
 "string literal" not anymore"
+/* test1 /* test2 */ test3  */ test4 
