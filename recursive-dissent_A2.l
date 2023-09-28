@@ -71,7 +71,8 @@ CONST ([\+-]?[1-9][0-9]*)|[0-9]+|'{CHAR}+'
 STRCHAR [^\"\\\n]|{ESCAPE}
 STRLIT \"{STRCHAR}*\"
 COMMENTSINGLE \/\/([^\n])*\n
-COMMENTMULTI \/\*(.|[\s\n])*\*\/ 
+COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
+
 
 
 %%
@@ -80,6 +81,7 @@ COMMENTMULTI \/\*(.|[\s\n])*\*\/
 {PUNCT} {printf("<PUNCT, %s>, ", yytext); return 1; }
 {CONST} {printf("<CONST, %s>, ", yytext); return 1; }
 {STRLIT} {printf("<STRLIT, %s>, ", yytext); return 1;}  
+
 {COMMENTSINGLE}|{COMMENTMULTI} {return 1;}
 
 [\s\n\t]* { return 1; }
@@ -87,3 +89,4 @@ COMMENTMULTI \/\*(.|[\s\n])*\*\/
 %%
 
 int yywrap() { return 1; }
+
