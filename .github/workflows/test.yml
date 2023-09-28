@@ -15,3 +15,8 @@ jobs:
 
     - name: test
       run: make test
+    
+    - name: diff
+      run: |
+        ./lexer.exe < recursive-dissent_A2.nc > test.out
+        diff ./test.out ./expected.out
