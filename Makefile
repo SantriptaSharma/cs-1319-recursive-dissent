@@ -1,12 +1,12 @@
 CC=gcc
 l=flex
 
-o=parser
+o=lexer
 
 team=recursive-dissent
 assignment=2
 
-default: clean $(o).exe
+build: clean $(o).exe
 
 $(o).exe: $(o).c
 	$(CC) -o $(o).exe $^ $(team)_A$(assignment).c
@@ -20,4 +20,4 @@ clean:
 test: $(o).exe
 	./$(o).exe < $(team)_A$(assignment).nc
 
-.PHONY: default clean test
+.PHONY: default clean test build

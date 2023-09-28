@@ -3,7 +3,9 @@
 
 # generated files
 *.exe
-parser.c
+lexer.c
+
+tex_build
 
 # redundant files
 *_old.*
