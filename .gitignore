@@ -5,7 +5,12 @@
 *.exe
 lexer.c
 
-tex_build
+# tex intermediate files
+*.aux
+*_latexmk
+*.fls
+*.log
+*.synctex*
 
 # redundant files
 *_old.*
