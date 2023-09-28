@@ -5,6 +5,11 @@ int d = -00045; //invalid actually
 
 int _valididentifier_ = +1;
 
+int *ptr = &d;
+int *ptrptr = &ptr;
+**ptr++;
+
+ptr->addr();
 
 if (name1 == "3454\n") {
 	return 'abc';

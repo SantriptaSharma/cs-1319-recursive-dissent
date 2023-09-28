@@ -1,9 +1,11 @@
 \documentclass{article}
 \usepackage{graphicx} % Required for inserting images
 
-\title{CS1319: PLDI - Assignment 1}
+\title{CS1319: PLDI - Assignment 2}
 \author{Hrsh Venket \& Santripta Sharma}
 \date{September 2023}
+
+\setlength{\parindent}{0pt}
 
 \begin{document}
 
@@ -11,51 +13,61 @@
 
 
 \section*{Explanation of Lexer}
-Below is the code we have written for the lexer. This explanation therefore is our attempt to explain our choises by explaining how our code and the given rules for the lexer are equivalent.\\
-\\
+Below is the code we have written for the lexer rules. This explanation therefore is our attempt to explain our choices by explaining how our code and the given rules for the lexer are equivalent.\bigskip
+
 First let us consider the obvious cases, where we have written the regex for the lexer exactly as we have been given in the assignment.
+
 \begin{verbatim}
 KEYWORD char|else|for|if|int|return|void
-PUNCT \[|\]|\(|\)|\{|\}|->|&|\*|\+|-|\/|%|!|\?|\<|\>|<=|>=|==|!=|&&|\\|\||=|:|;|,
+PUNCT \[|\]|\(|\)|\{|\}|->|&|\*|\+|-|\/|%|!|\?|\<|... (and so on)
 \end{verbatim}
-Here, we have simply written the regex as given in the assignment using a series of OR statements\\
-\\
+
+Here, we have simply written the regex as given in the assignment using a series of OR statements\bigskip
+
 The explanation for string literals also directly follows from the definition given in the assignment.
-\begin{verbatim}r
+
+\begin{verbatim}
 ESCAPE \\'|\\\?|\\\"|\\\\|\\a|\\b|\\f|\\n|\\r|\\t|\\v
 STRCHAR [^\"\\\n]|{ESCAPE}
 STRLIT \"{STRCHAR}*\"
-\end{verbatim}\\
-We define string characters as either the escape sequence or a member or the character set except for the double quote, the backslash and the newline character. We do this as we have done for the rest of the lexer, using \verb|^| to denote 'everything except'.\\
-\\
-String literals are defined as 1 or more string characters within double quotes.\\
-\\
-Two less obious cases are the single and multiline comments. For the single line comments, we have written the regex as follows:
+\end{verbatim}
+
+We define string characters as either the escape sequence or a member or the character set except for the double quote, the backslash and the newline character. We do this as we have done for the rest of the lexer, using \verb|^| to denote 'everything except'.\bigskip
+
+String literals are defined as 1 or more string characters within double quotes.\bigskip
+
+Two less obvious cases are the single and multiline comments. For the single line comments, we have written the regex as follows:
+
 \begin{verbatim}
 COMMENTSINGLE \/\/([^\n])*\n
 \end{verbatim}
-\\
-Here, \verb|\/\/| denotes the opening \verb|//| for a single line comment. Inside the comment, we allow any characters except for the newline operator. The \verb|*| means we can have 0 or more of the any type of character. It must thereby terminate with a newline character \verb|\n|.\\
-\\
+
+Here, \verb|\/\/| denotes the opening \verb|//| for a single line comment. Inside the comment, we allow any characters except for the newline operator. The \verb|*| means we can have 0 or more of the any type of character. It must thereby terminate with a newline character \verb|\n|.
+
 In the case of multline comments, our code is as below:
+
 \begin{verbatim}
 COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 \end{verbatim}
-\\
-The multilinecomment starts with \*, followed by 0 or more of any character except for * or */, and is closed by */. This is to ensure that the comments start on the open multiline and end on the last close multiline.\\
-\\
+
+The multilinecomment starts with /*, followed by any number of characters, but where the character can be a * only if the next character is anything else besides a /. Finally, the comment is closed by */. This ensures that comments end on the first close multiline (*/) encountered.\bigskip
+
 Now we can consider the less direct cases.
+
 \begin{verbatim}
-IDENT [a-zA-Z-][0-9a-zA-Z-]*
+IDENT [a-zA-Z\_][0-9a-zA-Z\_]*
 \end{verbatim}
-By definition, the identifier cannot start with a digit. Therefore, we define that the identifier must start with an identifier non-digit, \verb|[a-zA-Z-]|. This is followed by 0 or more identifier characters, \verb|[0-9a-zA-Z-]|, which can be digits or non-digits
+
+By definition, the identifier cannot start with a digit. Therefore, we define that the identifier must start with an identifier non-digit, \verb|[a-zA-Z\_]|. This is followed by 0 or more identifier characters, \verb|[0-9a-zA-Z\_]|, which can be digits or non-digits
+
 \begin{verbatim}
 CHAR [^\\'\n]|{ESCAPE}
 CONST ([\+-]?[1-9][0-9]*)|[0-9]+|'{CHAR}+'
 \end{verbatim}
-Here, we describe const, using some of the definitions given in the assignment. We define \verb|ESCAPE| as the escape sequence, which is relativel self explanatory. We define \verb|CHAR| as any character except for the singe quote and the newline character OR the escape sequence. We define \verb|CONST| as the constant, which can be a number, a character or a string.\\
-\\
-We therefore define const as 1 or more characters (or a character sequence), or an integer (defined with optional sign, starting with a non-zero digit and followed by 0 or more digits from 0-9). Finally, this also allows a random permutation of digits (0-9).\\
-\\
+
+Here, we describe const, using some of the definitions given in the assignment. We define \verb|CHAR| as any character except for the single quote, backslash, or the newline character OR an escape sequence. We define \verb|CONST| as the constant, which can be a number, a character, or a multicharacter literal (\>1 chars).\bigskip
+
+Besides character constants, we also define the integer constant as an optional sign, followed by a non-zero digit optionally followed by 0 or more digits from 0-9 OR a sequence of one or more digits 0-9 (no sign). \bigskip
+
 
 \end{document}
