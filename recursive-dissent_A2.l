@@ -23,14 +23,16 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 
 %%
 {KEYWORD} {printf("<KEYWORD, %s>, ", yytext); return 1; }
-{IDENT} {printf("<IDENT, %s>," , yytext); return 1;}
+{IDENT} {printf("<IDENT, %s>, " , yytext); return 1;}
 {PUNCT} {printf("<PUNCT, %s>, ", yytext); return 1; }
 {CONST} {printf("<CONST, %s>, ", yytext); return 1; }
 {STRLIT} {printf("<STRLIT, %s>, ", yytext); return 1;}  
 
 {COMMENTSINGLE}|{COMMENTMULTI} {return 1;}
 
-[\s\n\t]* { return 1; }
+[ \s\n\t]* {return 1;}
+
+. { return 0; }
 
 %%
 

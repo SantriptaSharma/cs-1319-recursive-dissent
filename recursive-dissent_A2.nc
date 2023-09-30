@@ -43,3 +43,4 @@ works hopefully these are idents*/
 
 "string literal" not anymore"
 /* test1 /* test2 */ test3  */ test4 
+ident after should be ignored because of mismatched " on stringliteral above
