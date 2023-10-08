@@ -5,6 +5,9 @@ int d = -00045; //invalid actually
 
 int _valididentifier_ = +1;
 
+swap
+top
+
 int *ptr = &d;
 int *ptrptr = &ptr;
 **ptr++;

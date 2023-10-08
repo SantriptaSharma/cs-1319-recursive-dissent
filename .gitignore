@@ -11,6 +11,7 @@ lexer.c
 *.fls
 *.log
 *.synctex*
+*.zip
 
 # redundant files
 *_old.*

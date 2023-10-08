@@ -30,7 +30,7 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 
 {COMMENTSINGLE}|{COMMENTMULTI} {return 1;}
 
-[ \s\n\t]* {return 1;}
+[ \n\t]* {return 1;}
 
 . { return 0; }
 

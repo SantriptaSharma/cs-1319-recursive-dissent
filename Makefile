@@ -6,10 +6,10 @@ o=lexer
 team=recursive-dissent
 assignment=2
 
-build: clean $(o).exe
+build: clean $(o)
 
-$(o).exe: $(o).c
-	$(CC) -o $(o).exe $^ $(team)_A$(assignment).c
+$(o): $(o).c
+	$(CC) -o $(o) $^ $(team)_A$(assignment).c
 
 $(o).c: $(team)_A$(assignment).l
 	$(l) -o$(o).c $^
@@ -17,7 +17,7 @@ $(o).c: $(team)_A$(assignment).l
 clean: 
 	rm -rf $(o).*
 
-test: $(o).exe
-	./$(o).exe < $(team)_A$(assignment).nc
+test: $(o)
+	./$(o) < $(team)_A$(assignment).nc
 
 .PHONY: default clean test build
