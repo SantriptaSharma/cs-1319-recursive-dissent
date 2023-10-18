@@ -1,21 +1,24 @@
 CC=gcc
 l=flex
+CFLAGS=-Wall -Wextra -Werror -pedantic -std=c11 -lfl
 
-o=lexer
+o=parser
+lx=lexer
 
-team=recursive-dissent
-assignment=2
+team=15
+assignment=3
 
 build: clean $(o)
 
-$(o): $(o).c
-	$(CC) -o $(o) $^ $(team)_A$(assignment).c
+$(o): $(lx).c
+	$(CC) $(CFLAGS) -o $(o) $^ $(team)_A$(assignment).c
 
-$(o).c: $(team)_A$(assignment).l
-	$(l) -o$(o).c $^
+$(lx).c: $(team)_A$(assignment).l
+	$(l) -o$(lx).c $^
 
 clean: 
 	rm -rf $(o).*
+	rm -rf $(lx).*
 
 test: $(o)
 	./$(o) < $(team)_A$(assignment).nc

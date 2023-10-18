@@ -15,3 +15,5 @@ lexer.c
 
 # redundant files
 *_old.*
+
+tex_build/../15_*.pdf
