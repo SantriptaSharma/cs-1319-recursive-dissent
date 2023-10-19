@@ -1,10 +1,6 @@
 %{
 
-#define KEYWORD 10
-#define IDENT 11
-#define CONST 12
-#define STRLIT 13
-#define PUNCT 14
+#include "15_A3.tab.h"
 
 %}
 
@@ -22,11 +18,11 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 
 
 %%
-{KEYWORD} {printf("<KEYWORD, %s>, ", yytext); return 1; }
-{IDENT} {printf("<IDENT, %s>, " , yytext); return 1;}
-{PUNCT} {printf("<PUNCT, %s>, ", yytext); return 1; }
-{CONST} {printf("<CONST, %s>, ", yytext); return 1; }
-{STRLIT} {printf("<STRLIT, %s>, ", yytext); return 1;}  
+{KEYWORD} { return KEYWORD; }
+{IDENT} { return IDENTIFIER;}
+{PUNCT} { return PUNCTUATOR; }
+{CONST} { return CONSTANT; }
+{STRLIT} { return STRING_LITERAL;}  
 
 {COMMENTSINGLE}|{COMMENTMULTI} {return 1;}
 

@@ -1,6 +1,6 @@
 CC=gcc
 l=flex
-CFLAGS=-Wall -Wextra -Werror -pedantic -std=c11 -lfl
+CFLAGS=-Werror -lfl
 
 o=parser
 lx=lexer
@@ -10,8 +10,11 @@ assignment=3
 
 build: clean $(o)
 
-$(o): $(lx).c
-	$(CC) $(CFLAGS) -o $(o) $^ $(team)_A$(assignment).c
+$(o): $(team)_A$(assignment).tab.c $(lx).c
+	$(CC) -o $(o) $^ $(team)_A$(assignment).c $(CFLAGS)
+
+$(team)_A$(assignment).tab.c: $(team)_A$(assignment).y
+	bison -d $^
 
 $(lx).c: $(team)_A$(assignment).l
 	$(l) -o$(lx).c $^
@@ -19,6 +22,7 @@ $(lx).c: $(team)_A$(assignment).l
 clean: 
 	rm -rf $(o).*
 	rm -rf $(lx).*
+	rm -rf $(team)_A$(assignment).tab.*
 
 test: $(o)
 	./$(o) < $(team)_A$(assignment).nc

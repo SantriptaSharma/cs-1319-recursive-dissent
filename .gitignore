@@ -4,6 +4,8 @@
 # generated files
 *.exe
 lexer.c
+parser.c
+*.tab.*
 
 # tex intermediate files
 *.aux
