@@ -7,11 +7,21 @@
 	void yyerror(char *s);
 %}
 
-%token KEYWORD
+/* %token KEYWORD */
 %token IDENTIFIER
 %token CONSTANT
 %token STRING_LITERAL
-%token PUNCTUATOR
+/* %token PUNCTUATOR */
+
+%token ARROW
+%token GEQ
+%token LEQ
+%token CEQ
+%token NEQ
+%token LAND
+%token LOR
+
+%start expression
 
 %%
 primary_expression:
@@ -25,7 +35,7 @@ postfix_expression:
 	| postfix_expression '[' expression ']'
 	| postfix_expression '(' argument_expression_list ')'
 	| postfix_expression '(' ')'
-	| postfix_expression '-''>'IDENTIFIER
+	| postfix_expression ARROW IDENTIFIER
 
 argument_expression_list:
 	assignment_expression
@@ -53,25 +63,25 @@ relational_expression:
 	additive_expression
 	| relational_expression '<' additive_expression
 	| relational_expression '>' additive_expression
-	| relational_expression '<' '=' additive_expression
-	| relational_expression '>' '=' additive_expression
+	| relational_expression LEQ additive_expression
+	| relational_expression GEQ additive_expression
 
 equality_expression:
 	relational_expression
-	| equality_expression '=' '=' relational_expression
-  	| equality_expression '!' '=' relational_expression
+	| equality_expression CEQ relational_expression
+  	| equality_expression NEQ relational_expression
 
 logical_AND_expression:
 	equality_expression
-	| logical_AND_expression '&' '&' equality_expression
+	| logical_AND_expression LAND equality_expression
 
 logical_OR_expression:
 	logical_AND_expression
-	| logical_OR_expression '|' '|' logical_AND_expression
+	| logical_OR_expression LOR logical_AND_expression
 
 conditional_expression:
-	conditional_expression
-	| unary_expression '=' assignment_expression
+	logical_OR_expression
+	| logical_OR_expression '?' expression ':' conditional_expression
 
 assignment_expression:
 	conditional_expression

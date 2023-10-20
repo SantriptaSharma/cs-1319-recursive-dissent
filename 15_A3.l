@@ -1,7 +1,7 @@
 %{
-
-#include "15_A3.tab.h"
-
+#ifndef NO_YY
+	#include "15_A3.tab.h"
+#endif
 %}
 
 KEYWORD char|else|for|if|int|return|void
@@ -18,18 +18,23 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 
 
 %%
-{KEYWORD} { return KEYWORD; }
 {IDENT} { return IDENTIFIER;}
-{PUNCT} { return PUNCTUATOR; }
 {CONST} { return CONSTANT; }
 {STRLIT} { return STRING_LITERAL;}  
 
-{COMMENTSINGLE}|{COMMENTMULTI} {return 1;}
+"->" { return ARROW; }
+">=" { return GEQ; }
+"<=" { return LEQ; }
+"==" { return CEQ; }
+"!=" { return NEQ; }
+"&&" { return LAND; }
+"||" { return LOR; }
 
-[ \n\t]* {return 1;}
+{COMMENTSINGLE}|{COMMENTMULTI} {}
 
-. { return 0; }
+[ \n\t]* {}
 
+. { return yytext[0]; }
 %%
 
 int yywrap() { return 1; }
