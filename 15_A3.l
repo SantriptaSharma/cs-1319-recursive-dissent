@@ -4,12 +4,11 @@
 #endif
 %}
 
-KEYWORD char|else|for|if|int|return|void
 IDENT [a-zA-Z\_][0-9a-zA-Z\_]*
-PUNCT \[|\]|\(|\)|\{|\}|->|&|\*|\+|-|\/|%|!|\?|\<|\>|<=|>=|==|!=|&&|\\|\||=|:|;|,
 ESCAPE \\'|\\\?|\\\"|\\\\|\\a|\\b|\\f|\\n|\\r|\\t|\\v
 CHAR [^\\'\n]|{ESCAPE}
-CONST ([\+-]?[1-9][0-9]*)|[0-9]+|'{CHAR}+'
+CHARCONST '{CHAR}+'
+INTCONST ([\+-]?[1-9][0-9]*)|[0-9]+
 STRCHAR [^\"\\\n]|{ESCAPE}
 STRLIT \"{STRCHAR}*\"
 COMMENTSINGLE \/\/([^\n])*\n
@@ -18,8 +17,17 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 
 
 %%
+"void" { return VOID; }
+"char" { return CHAR; }
+"int" { return INT; }
+"if" { return IF; }
+"else" { return ELSE; }
+"for" { return FOR; }
+"return" { return RETURN; }
+
 {IDENT} { return IDENTIFIER;}
-{CONST} { return CONSTANT; }
+{INTCONST} { return INTCONST; }
+{CHARCONST} { return CHARCONST; }
 {STRLIT} { return STRING_LITERAL;}  
 
 "->" { return ARROW; }

@@ -8,11 +8,13 @@
 %}
 
 /* %token KEYWORD */
-%token IDENTIFIER
-%token CONSTANT
-%token STRING_LITERAL
-/* %token PUNCTUATOR */
 
+%token IDENTIFIER
+%token INTCONST
+%token CHARCONST
+%token STRING_LITERAL
+
+/* %token PUNCTUATOR */
 %token ARROW
 %token GEQ
 %token LEQ
@@ -20,13 +22,25 @@
 %token NEQ
 %token LAND
 %token LOR
+%token VOID
+%token CHAR
+%token INT
+%token IF
+%token ELSE
+%token FOR
+%token RETURN
 
-%start expression
+%start translation_unit
 
 %%
+/* expressions */
+constant:
+	INTCONST
+	| CHARCONST
+
 primary_expression:
 	IDENTIFIER
-	| CONSTANT
+	| constant
 	| STRING_LITERAL
 	| '(' expression ')'
 
@@ -89,6 +103,91 @@ assignment_expression:
 
 expression:
 	assignment_expression
+
+/* Declarations */
+
+declaration:
+	type_specifier init_declarator
+
+init_declarator:
+	declarator
+	| declarator '=' initalizer
+	
+type_specifier:
+	VOID
+	| CHAR
+	| INT
+
+declarator:
+	pointer direct_declarator
+	| direct_declarator
+
+direct_declarator:
+	IDENTIFIER
+	| IDENTIFIER '[' INTCONST ']'
+	| IDENTIFIER '(' parameter_list ')'
+	| IDENTIFIER '(' ')'
+
+pointer:
+	'*'
+
+parameter_list:
+	parameter_declaration
+	| parameter_list ',' parameter_declaration
+	
+parameter_declaration:
+	type_specifier pointer IDENTIFIER
+	| type_specifier IDENTIFIER
+	| type_specifier pointer
+	| type_specifier
+
+initalizer:
+	assignment_expression
+
+/* Statements */
+statement:
+	compound_statement
+	| expression_statement
+	| selection_statement
+	| iteration_statement
+	| jump_statement
+
+compound_statement:
+	'{' '}'
+	| '{' block_item_list '}'
+	
+block_item_list:
+	block_item
+	| block_item_list block_item
+
+block_item:
+	declaration
+	| statement
+
+opt_expression:
+	expression
+	| /* empty */
+
+expression_statement:
+	opt_expression ';'
+
+selection_statement:
+	IF '(' expression ')' statement
+	| IF '(' expression ')' statement ELSE statement
+
+iteration_statement:
+	FOR '(' opt_expression ';' opt_expression ';' opt_expression ')' statement
+	
+jump_statement:
+	RETURN opt_expression ';'
+
+/* TLU */
+translation_unit:
+	function_definition
+	| declaration
+	
+function_definition:
+	type_specifier declarator compound_statement
 %%
 
 void yyerror(char *s) {

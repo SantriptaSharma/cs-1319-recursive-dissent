@@ -4,7 +4,7 @@
 int yyparse();
 int yylex();
 
-int yydebug;
+extern int yydebug;
 
 int main(int argc, const char *argv[]) {
 	while (argc > 1) {
