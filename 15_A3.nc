@@ -1,49 +1,15 @@
-int a = 341;
-int b = 0213;
-int c = -123;
-int d = -00045; //invalid actually
-
-int _valididentifier_ = +1;
-
-swap
-top
-
-int *ptr = &d;
-int *ptrptr = &ptr;
-**ptr++;
-
-ptr->addr();
-
-if (name1 == "3454\n") {
-	return 'abc';
+// Find factorial by iteration
+int main() {
+int n;
+int i = 0;
+int r = 1;
+readInt(&n);
+for(i = 1; i <= n; i = i + 1)
+r = r * i;
+printInt(n);
+printStr("! = ");
+printInt(r);
+r->thing;
+*r;
+return 0;
 }
-
-void identifierguy(int x = -31) {
-	if (x == -31) {
-		//identified
-		return;
-	}
-	else {
-		for (;;)
-		{
-			// not identified :(
-			printf("aaaaaaaaaaaaaaaaaaaaa");
-		}
-	}
-}
-
-// wdsadwaw
-"weirdo stringliteral /*hopefully not a comment*/ \n \n \n \n "
-
-/* error/* error 2
-multiline error		
-*/ 1*/
-
-
-/*pioqwepoiqew*/ asdipoi 
-a /*new lined comment???*/
-works hopefully these are idents*/
-
-"string literal" not anymore"
-/* test1 /* test2 */ test3  */ test4 
-ident after should be ignored because of mismatched " on stringliteral above
