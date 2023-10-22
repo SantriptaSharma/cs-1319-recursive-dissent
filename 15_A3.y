@@ -107,7 +107,7 @@ expression:
 /* Declarations */
 
 declaration:
-	type_specifier init_declarator
+	type_specifier init_declarator ';'
 
 init_declarator:
 	declarator

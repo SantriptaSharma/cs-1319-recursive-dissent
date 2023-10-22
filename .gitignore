@@ -7,6 +7,10 @@ lexer.c
 parser.c
 *.tab.*
 
+#debugger files
+counterexamples
+*.out
+
 # tex intermediate files
 *.aux
 *_latexmk
