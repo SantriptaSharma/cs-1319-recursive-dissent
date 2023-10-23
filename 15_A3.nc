@@ -1,6 +1,9 @@
-// Find factorial by iteration
+// Find factorial by iteration and more stuff
 int main() {
 int n;
+/* garbage 
+
+comment */
 int i = 0;
 int r = 1;
 readInt(&n);
@@ -12,4 +15,6 @@ printInt(r);
 r->thing;
 *r;
 return 0;
+
+// sidyaj was here
 }

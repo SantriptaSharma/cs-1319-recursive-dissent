@@ -11,6 +11,9 @@ parser.c
 counterexamples
 *.out
 
+#assignment scripts
+*.sh
+
 # tex intermediate files
 *.aux
 *_latexmk
