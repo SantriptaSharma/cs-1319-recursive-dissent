@@ -40,7 +40,7 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 
 {COMMENTSINGLE}|{COMMENTMULTI} {}
 
-[ \n\t]* {}
+[ \n\t\r]* {}
 
 . { return yytext[0]; }
 %%
