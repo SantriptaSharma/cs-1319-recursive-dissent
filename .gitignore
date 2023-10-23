@@ -19,6 +19,8 @@ counterexamples
 *.synctex*
 *.zip
 
+*.tar
+
 # redundant files
 *_old.*
 
