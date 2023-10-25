@@ -186,8 +186,12 @@ jump_statement:
 
 /* TLU */
 translation_unit:
-	function_definition {log("translation-unit")}
-	| declaration {log("translation-unit")}
+	external_declaration {log("translation-unit")}
+	| translation_unit external_declaration {log("translation-unit")}
+
+external_declaration:
+	function_definition {log("external-declaration")}
+	| declaration {log("external-declaration")}
 	
 function_definition:
 	type_specifier declarator compound_statement {log("function-definition")}

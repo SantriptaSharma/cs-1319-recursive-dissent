@@ -28,11 +28,8 @@ $(lx).c: $(fname).l
 	$(l) -o$(lx).c $^
 
 clean: 
-	rm -rf $(o).*
-	rm -rf $(lx).*
+	rm -rf $(o)*
+	rm -rf $(lx)*
 	rm -rf $(fname).tab.*
 
-test: $(o)
-	./$(o) < $(fname).nc
-
-.PHONY: default clean test build lex
+.PHONY: default clean build lex

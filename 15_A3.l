@@ -7,8 +7,8 @@
 IDENT [a-zA-Z\_][0-9a-zA-Z\_]*
 ESCAPE \\'|\\\?|\\\"|\\\\|\\a|\\b|\\f|\\n|\\r|\\t|\\v
 CHAR [^\\'\n]|{ESCAPE}
-CHARCONST '{CHAR}+'
-INTCONST ([\+-]?[1-9][0-9]*)|[0-9]+
+CHARCONST \'{CHAR}+\'
+INTCONST [0-9]*
 STRCHAR [^\"\\\n]|{ESCAPE}
 STRLIT \"{STRCHAR}*\"
 COMMENTSINGLE \/\/([^\n])*\n
