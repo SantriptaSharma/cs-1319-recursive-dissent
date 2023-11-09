@@ -3,33 +3,35 @@ l=flex
 yy=bison
 CFLAGS=-Werror -lfl
 
-
-o=parser
+o=translator
 lx=lexer
 
 team=15
-assignment=3
+assignment=4
 
 fname=$(team)_A$(assignment)
 
-build: clean $(o)
-lex: clean $(lx)
+build: $(o)
 
-$(o): $(team)_A$(assignment).tab.c $(lx).c
-	$(CC) -o $(o) $^ $(fname).c $(CFLAGS)
+$(o): $(fname)_translator.o $(fname).tab.o $(lx).o
+	$(CC) -o $@ $^ $(CFLAGS)
 
-$(lx): $(lx).c $(fname).tab.c
-	$(CC) -o $(lx) $< lexermain.c
+$(lx): lexmain.o $(lx).o
+	$(CC) -o $@ $^
 
 $(fname).tab.c: $(fname).y
 	$(yy) -d $^ -t
 
-$(lx).c: $(fname).l
-	$(l) -o$(lx).c $^
+$(lx).c: $(fname).l $(fname).tab.c
+	$(l) -o$@ $<
+
+%.o: %.c
+	$(CC) -c $^ $(CFLAGS)
 
 clean: 
 	rm -rf $(o)*
 	rm -rf $(lx)*
+	rm -rf *.o
 	rm -rf $(fname).tab.*
 
 .PHONY: default clean build lex

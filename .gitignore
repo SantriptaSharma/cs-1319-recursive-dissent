@@ -7,13 +7,11 @@ parser
 lexer.c
 parser.c
 *.tab.*
+*.o
 
 #debugger files
 counterexamples
 *.out
-
-#assignment scripts
-*.sh
 
 # tex intermediate files
 *.aux
