@@ -97,13 +97,15 @@ argument_expression_list:
 	assignment_expression {log("argument-expression-list")}
 	| argument_expression_list ',' assignment_expression {log("argument-expression-list")}
 
+// TODO: write out relational actions using dummy keys
+
 unary_expression:
 	postfix_expression
 	| '&' unary_expression {$$ = GenTemp(); Emit(UnaryOp(ADDR, ASym($$), ASym($2)));}
 	| '*' unary_expression {$$ = GenTemp(); Emit(UnaryOp(DEREF, ASym($$), ASym($2)));}
 	| '+' unary_expression {$$ = GenTemp(); Emit(UnaryOp(POS, ASym($$), ASym($2)));}
 	| '-' unary_expression {$$ = GenTemp(); Emit(UnaryOp(NEG, ASym($$), ASym($2)));}
-	| '!' unary_expression {$$ = GenTemp(); Emit(UnaryOp(NOT, ASym($$), ASym($2)));}
+	| '!' unary_expression {$$ = $2}
 
 multiplicative_expression:
 	unary_expression

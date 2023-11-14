@@ -28,7 +28,8 @@ static void FreeQuads()
 
 static const char *OpSym[] = {
 	[ADD] "+", [SUB] "-", [MUL] "*", [DIV] "/", [MOD] "%%",
-	[POS] "+", [NEG] "-", [ADDR] "&", [DEREF] "*", [NOT] "!"
+	[POS] "+", [NEG] "-", [ADDR] "&", [DEREF] "*", [JLT] "<",
+	[JGT] ">", [JEQ] "==", [JNE] "!=", [JLE] "<=", [JGE] ">=",
 };
 
 static const int Sizes[] = {
@@ -66,7 +67,6 @@ void DisplayQuad(Quad q) {
 		break;
 		case POS:
 		case NEG:
-		case NOT:
 		case ADDR:
 		case DEREF:
 			printf("%s = %s", q.rd.sym->name, OpSym[q.opcode]);
@@ -85,12 +85,28 @@ void DisplayQuad(Quad q) {
 			DisplayAddr(q.rs);
 			printf(" goto %s", q.rd.sym->name);
 		break;
+		case JLT:
+		case JGT:
+		case JEQ:
+		case JNE:
+		case JLE:
+		case JGE:
+			printf("if ");
+			DisplayAddr(q.rs);
+			printf(" %s ", OpSym[q.opcode]);
+			DisplayAddr(q.rt);
+			printf(" goto %s", q.rd.sym->name);
+		break;
 		case PAR:
 			printf("param ");
 			DisplayAddr(q.rs);
 		break;
 		case CAL:
-			printf("%s = call %s, %d", q.rd.sym->name, q.rs.sym->name, q.rd.imm);
+			if (q.rs.kind == SYMBOL_A)
+				printf("%s = call %s, %d", q.rs.sym->name, q.rd.sym->name, 10000);
+			else if (q.rs.kind == IMMEDIATE) {
+				printf("call %s, %d", q.rd.sym->name, 10000);
+			}
 		break;
 		case RET:
 			printf("return");
@@ -184,22 +200,29 @@ void SymTableDispl(SymbolTable *table)
 	}
 }
 
-// Get size of object of type after cutting through all indirection
-int GetBaseSize(Type type) {
+// Get size of an object of this type on the virtual stack
+int GetSize(Type type) {
 	switch (type.kind)
 	{
 		case PRIMITIVE_T:
-		case PRIMITIVE_PTR:
-			return Sizes[type.primitive]; 
+		case TEMP_T:
 			return Sizes[type.primitive];
 		break;
 
+		case PRIMITIVE_PTR:
+			return size_of_pointer;
+		break;
+
 		case ARRAY_T:
-			return Sizes[type.array.base];
+			return Sizes[type.array.base] * type.array.size;
 		break;
 		
 		case FUNC_T:
 			return 0;
+		break;
+
+		default:
+			return size_of_pointer;
 		break;
 	}	
 }
@@ -261,7 +284,13 @@ Symbol *GenTemp()
 	char name[16];
 	sprintf(name, "__t_%d_", current_table->temp_count++);
 
-	return SymLookupOrInsert(name);
+	Symbol *sym = SymLookupOrInsert(name);
+	sym->type.kind = TEMP_T;
+
+	sym->size = GetSize(sym->type);
+	printf("Generated temp %s of size %d\n", sym->name, sym->size);
+
+	return sym;
 }
 
 void SymInsert(Symbol *sym)
@@ -284,10 +313,18 @@ void SymFree(Symbol *sym)
 	free(sym);
 }
 
+static const char *TypeSym[] = {
+	[PRIMITIVE_T] "PRIMITIVE_T",
+	[PRIMITIVE_PTR] "PRIMITIVE_PTR",
+	[TEMP_T] "TEMP_T",
+	[ARRAY_T] "ARRAY_T",
+	[FUNC_T] "FUNC_T"
+};
+
 void SymDispl(Symbol *sym)
 {
 	printf("Symbol %s: ", sym->name);
-	printf("%s, ", sym->type.kind == PRIMITIVE_T ? "PRIMITIVE" : sym->type.kind == ARRAY_T ? "ARRAY" : "FUNC");
+	printf("%s, ", TypeSym[sym->type.kind]);
 	printf("Initial value %d, ", sym->initial_value);
 	printf("%d bytes, ", sym->size);
 	printf("@%d, ", sym->offset);

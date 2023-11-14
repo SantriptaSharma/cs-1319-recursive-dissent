@@ -16,9 +16,9 @@ typedef struct _Addr {
 } Addr;
 
 // TODO: remove not if assignment finally does not ask for it, a couple places to remove from
-// TODO: expand branch instructions for diff relational operations jeq, jlt etc
 typedef struct {
-	enum OPCODE {ADD, SUB, MUL, DIV, MOD, MOV, POS, NEG, NOT, ADDR, DEREF, JMP, JIF, JNT, PAR, CAL, RET, INDR, INDW, PTRW} opcode;
+	enum OPCODE {ADD, SUB, MUL, DIV, MOD, MOV, POS, NEG, ADDR, DEREF, JMP, JIF, JNT, 
+	JLT, JGT, JEQ, JNE, JLE, JGE, PAR, CAL, RET, INDR, INDW, PTRW} opcode;
 	Addr rs, rt, rd;
 } Quad;
 
@@ -35,9 +35,9 @@ void Emit(Quad q);
 #define UnaryOp(op, dest, opr) ((Quad){op, opr, AImm(0), dest})
 #define Jump(dest) ((Quad){JMP, AImm(0), AImm(0), dest})
 #define JumpIf(dest, cond) ((Quad){JIF, cond, AImm(0), dest})
-#define JumpIfNot(dest, cond) ((Quad){JNT, cond, AImm(0), dest})
 #define Param(source) ((Quad){PAR, source, AImm(0), AImm(0)})
-#define Call(dest) ((Quad){CAL, AImm(0), AImm(0), dest})
+#define Call(func) ((Quad){CAL, AImm(0), AImm(0), func})
+#define CallAss(dest, func) ((Quad){CAL, dest, AImm(0), func})
 #define Return() ((Quad){RET, AImm(0), AImm(0), AImm(0)})
 #define IndexRead(dest, source, index) ((Quad){INDR, source, index, dest})
 #define IndexWrite(dest, index, source) ((Quad){INDW, source, index, dest})
@@ -64,7 +64,7 @@ typedef enum {CHAR_T, INT_T} PRIMITIVE_TYPE;
 
 typedef struct _Type {
 	// needs some kind of types table + hashing mechanism to reuse types, instead of always creating new ones (wont implement for now)
-	enum KIND_T {PRIMITIVE_PTR, PRIMITIVE_T, ARRAY_T, FUNC_T} kind;
+	enum KIND_T {PRIMITIVE_PTR, TEMP_T, PRIMITIVE_T, ARRAY_T, FUNC_T} kind;
 	union {
 		PRIMITIVE_TYPE primitive;
 		struct {
@@ -79,7 +79,7 @@ typedef struct _Type {
 	struct _Type *next;
 } Type;
 
-int GetBaseSize(Type type);
+int GetSize(Type type);
 void TypeFree(Type *type);
 
 typedef struct _Symbol {
