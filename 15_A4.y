@@ -65,70 +65,87 @@ constant:
 	| CHARCONST
 
 primary_expression:
-	IDENTIFIER {log("primary-expression")}
-	| constant {log("primary-expression")}
-	| STRING_LITERAL {log("primary-expression")}
-	| '(' expression ')' {log("primary-expression")}
+	IDENTIFIER
+	| constant {$$ = GenTemp(); Emit(Mov(ASym($$), AImm($1)));}
+	| STRING_LITERAL {
+		// TODO: figure out string storage
+		log("primary-expression")
+	}
+	| '(' expression ')' {$$ = $2;}
 
 postfix_expression:
-	primary_expression {log("postfix-expression")}
-	| postfix_expression '[' expression ']' {log("postfix-expression")}
-	| postfix_expression '(' argument_expression_list ')' {log("postfix-expression")}
-	| postfix_expression '(' ')' {log("postfix-expression")}
-	| postfix_expression ARROW IDENTIFIER {log("postfix-expression")}
+	primary_expression
+	| postfix_expression '[' expression ']' {
+		// TODO: add error detection, make sure $1 is a pointer
+		$$ = GenTemp(); Emit(IndexRead(ASym($$), ASym($1), ASym($3)));
+	}
+	| postfix_expression '(' argument_expression_list ')' {
+		// TODO: call, validate number and type of params
+		log("postfix-expression")
+	}
+	| postfix_expression '(' ')' {
+		// TODO: call, validate number and type of params
+		log("postfix-expression")
+	}
+	| postfix_expression ARROW IDENTIFIER {
+		// TODO: not sure what to do here? we don't have structs
+		log("postfix-expression")
+	}
 
+// TODO: build assignment expression lists
 argument_expression_list:
 	assignment_expression {log("argument-expression-list")}
 	| argument_expression_list ',' assignment_expression {log("argument-expression-list")}
 
 unary_expression:
-	postfix_expression {log("unary-expression")}
-	| unary_operator unary_expression {log("unary-expression")}
-
-unary_operator:
-	'&' {log("unary-operator")} | '*' {log("unary-operator")} | '+' {log("unary-operator")} | '-' {log("unary-operator")} | '!' {log("unary-operator")} 
+	postfix_expression
+	| '&' unary_expression {$$ = GenTemp(); Emit(UnaryOp(ADDR, ASym($$), ASym($2)));}
+	| '*' unary_expression {$$ = GenTemp(); Emit(UnaryOp(DEREF, ASym($$), ASym($2)));}
+	| '+' unary_expression {$$ = GenTemp(); Emit(UnaryOp(POS, ASym($$), ASym($2)));}
+	| '-' unary_expression {$$ = GenTemp(); Emit(UnaryOp(NEG, ASym($$), ASym($2)));}
+	| '!' unary_expression {$$ = GenTemp(); Emit(UnaryOp(NOT, ASym($$), ASym($2)));}
 
 multiplicative_expression:
-	unary_expression {log("multiplicative-expression")}
-	| multiplicative_expression '*' unary_expression {log("multiplicative-expression")}
-	| multiplicative_expression '/' unary_expression {log("multiplicative-expression")}
-	| multiplicative_expression '%' unary_expression {log("multiplicative-expression")}
+	unary_expression
+	| multiplicative_expression '*' unary_expression {$$ = GenTemp(); Emit(BinOp(MUL, ASym($$), ASym($1), ASym($3)));}
+	| multiplicative_expression '/' unary_expression {$$ = GenTemp(); Emit(BinOp(DIV, ASym($$), ASym($1), ASym($3)));}
+	| multiplicative_expression '%' unary_expression {$$ = GenTemp(); Emit(BinOp(MOD, ASym($$), ASym($1), ASym($3)));}
 
 additive_expression:
-	multiplicative_expression {log("additive-expression")}
-	| additive_expression '+' multiplicative_expression {log("additive-expression")}
-	| additive_expression '-' multiplicative_expression {log("additive-expression")}
+	multiplicative_expression
+	| additive_expression '+' multiplicative_expression {$$ = GenTemp(); Emit(BinOp(ADD, ASym($$), ASym($1), ASym($3)));}
+	| additive_expression '-' multiplicative_expression {$$ = GenTemp(); Emit(BinOp(SUB, ASym($$), ASym($1), ASym($3)));}
 
 relational_expression:
-	additive_expression {log("relational-expression")}
+	additive_expression
 	| relational_expression '<' additive_expression {log("relational-expression")}
 	| relational_expression '>' additive_expression {log("relational-expression")}
 	| relational_expression LEQ additive_expression {log("relational-expression")}
 	| relational_expression GEQ additive_expression {log("relational-expression")}
 
 equality_expression:
-	relational_expression {log("equality-expression")}
+	relational_expression
 	| equality_expression CEQ relational_expression {log("equality-expression")}
   	| equality_expression NEQ relational_expression {log("equality-expression")}
 
 logical_AND_expression:
-	equality_expression {log("logical-AND-expression")}
+	equality_expression
 	| logical_AND_expression LAND equality_expression {log("logical-AND-expression")}
 
 logical_OR_expression:
-	logical_AND_expression {log("logical-OR-expression")}
+	logical_AND_expression
 	| logical_OR_expression LOR logical_AND_expression {log("logical-OR-expression")}
 
 conditional_expression:
-	logical_OR_expression {log("conditional-expression")}
+	logical_OR_expression
 	| logical_OR_expression '?' expression ':' conditional_expression {log("conditional-expression")}
 
 assignment_expression:
-	conditional_expression {log("assignment-expression")}
+	conditional_expression
 	| unary_expression '=' assignment_expression {log("assignment-expression")}
 
 expression:
-	assignment_expression {log("expression")}
+	assignment_expression
 
 /* Declarations */
 

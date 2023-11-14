@@ -1,5 +1,6 @@
 %{
 #ifndef NO_YY
+	#include "15_A4_translator.h"
 	#include "15_A4.tab.h"
 #endif
 %}
@@ -26,8 +27,12 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 "return" { return RETURN; }
 
 {IDENT} { return IDENTIFIER;}
-{INTCONST} { return INTCONST; }
-{CHARCONST} { return CHARCONST; }
+{INTCONST} { yylval.val = atoi(yytext); return INTCONST; }
+
+	/* TODO: Account for multibyte character constants (shift and accumulate) */
+{CHARCONST} { 
+	yylval.val = (int) yytext[1]; return CHARCONST; 
+}
 {STRLIT} { return STRING_LITERAL;}  
 
 "->" { return ARROW; }

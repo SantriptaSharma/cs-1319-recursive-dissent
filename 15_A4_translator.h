@@ -1,28 +1,57 @@
 #ifndef _TRANSLATOR_H_
 #define _TRANSLATOR_H_
 
-const unsigned int size_of_char = 1;
-const unsigned int size_of_int = 4;
-const unsigned int size_of_pointer = 4;
+extern const unsigned int size_of_char;
+extern const unsigned int size_of_int;
+extern const unsigned int size_of_pointer;
 
+struct _Symbol;
+
+typedef struct _Addr {
+	enum ADDR_KIND {SYMBOL_A, IMMEDIATE} kind;
+	union {
+		int imm;
+		struct _Symbol *sym;
+	};
+} Addr;
+
+// TODO: remove not if assignment finally does not ask for it, a couple places to remove from
+// TODO: expand branch instructions for diff relational operations jeq, jlt etc
 typedef struct {
-	enum OPCODE {ADD, SUB, MUL, DIV, MOD, POS, NEG, PTR, JMP, JIF, JNT, PAR, CAL, RET, INDR, INDW, ADDR, DEREF, PTRW} opcode;
-	int arg1, arg2, arg3;
+	enum OPCODE {ADD, SUB, MUL, DIV, MOD, MOV, POS, NEG, NOT, ADDR, DEREF, JMP, JIF, JNT, PAR, CAL, RET, INDR, INDW, PTRW} opcode;
+	Addr rs, rt, rd;
 } Quad;
-
 
 extern int quads_size, quads_capacity;
 extern Quad *quads;
 
+#define AImm(x) ((Addr){IMMEDIATE, .imm = x})
+#define ASym(x) ((Addr){SYMBOL_A, .sym = x})
+
 void Emit(Quad q);
 
-struct _Symbol;
+#define Mov(dest, source) ((Quad){MOV, source, AImm(0), dest})
+#define BinOp(op, dest, op1, op2) ((Quad){op, op1, op2, dest})
+#define UnaryOp(op, dest, opr) ((Quad){op, opr, AImm(0), dest})
+#define Jump(dest) ((Quad){JMP, AImm(0), AImm(0), dest})
+#define JumpIf(dest, cond) ((Quad){JIF, cond, AImm(0), dest})
+#define JumpIfNot(dest, cond) ((Quad){JNT, cond, AImm(0), dest})
+#define Param(source) ((Quad){PAR, source, AImm(0), AImm(0)})
+#define Call(dest) ((Quad){CAL, AImm(0), AImm(0), dest})
+#define Return() ((Quad){RET, AImm(0), AImm(0), AImm(0)})
+#define IndexRead(dest, source, index) ((Quad){INDR, source, index, dest})
+#define IndexWrite(dest, index, source) ((Quad){INDW, source, index, dest})
+#define DerefWrite(dest, source) ((Quad){PTRW, dest, AImm(0), source})
+
+void DisplayQuad(Quad q);
+void DisplayQuads();
 
 typedef struct _SymbolTable {
 	const char *name;
 	enum Scope {GLOBAL, FUNC, BLOCK} scope;
 	struct _SymbolTable *parent;
 	struct _Symbol *sym_head, *sym_tail;
+	int temp_count;
 } SymbolTable;
 
 extern SymbolTable glb_table, *current_table;
@@ -31,15 +60,15 @@ SymbolTable *Create_SymbolTable(const char *name, enum Scope scope, SymbolTable 
 void Destroy_SymbolTable(SymbolTable *table);
 void SymTableDispl(SymbolTable *table);
 
-typedef enum {CHAR, INT} PRIMITIVE_TYPE;
+typedef enum {CHAR_T, INT_T} PRIMITIVE_TYPE;
 
 typedef struct _Type {
 	// needs some kind of types table + hashing mechanism to reuse types, instead of always creating new ones (wont implement for now)
-	enum KIND_T {PRIMITIVE_T, ARRAY_T, FUNC_T} kind;
+	enum KIND_T {PRIMITIVE_PTR, PRIMITIVE_T, ARRAY_T, FUNC_T} kind;
 	union {
 		PRIMITIVE_TYPE primitive;
 		struct {
-			struct _Type *base;
+			PRIMITIVE_TYPE base;
 			int size;
 		} array;
 		struct {
@@ -50,6 +79,7 @@ typedef struct _Type {
 	struct _Type *next;
 } Type;
 
+int GetBaseSize(Type type);
 void TypeFree(Type *type);
 
 typedef struct _Symbol {
@@ -63,7 +93,8 @@ typedef struct _Symbol {
 } Symbol;
 
 Symbol *SymLookup(const char *name);
-Symbol *GenTemp(PRIMITIVE_TYPE type);
+Symbol *SymLookupOrInsert(const char *name);
+Symbol *GenTemp();
 void SymInsert(Symbol *sym);
 void SymFree(Symbol *sym);
 void SymDispl(Symbol *sym);
