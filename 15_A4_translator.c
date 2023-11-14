@@ -119,7 +119,7 @@ Symbol *SymLookup(const char *name)
 	return NULL;
 }
 
-Symbol *GenTemp()
+Symbol *GenTemp(PRIMITIVE_TYPE type)
 {
 	static int temp_count = 0;
 	char name[16];
@@ -130,7 +130,7 @@ Symbol *GenTemp()
 	sym->name = strdup(name);
 	sym->type = (Type) {
 		.kind = PRIMITIVE_T,
-		.primitive = INT
+		.primitive = type
 	};
 	sym->initial_value = 0;
 	sym->size = size_of_int;
@@ -138,6 +138,7 @@ Symbol *GenTemp()
 	sym->inner_table = NULL;
 	sym->next = NULL;
 
+	SymInsert(sym);
 	return sym;
 }
 

@@ -2,6 +2,8 @@
 	#include <stdio.h> 
 	#include <stdlib.h>
 
+	#include "15_A4_translator.h"
+
 	#define log(...) printf(__VA_ARGS__); printf("\n");
 
 	extern int yylex();
@@ -10,11 +12,18 @@
 	void yyerror(char *s);
 %}
 
+%union {
+	Symbol *sym;
+	const char *string;
+	int val;	
+}
+
 /* %token KEYWORD */
 
-%token IDENTIFIER
-%token INTCONST
-%token CHARCONST
+%token <sym> IDENTIFIER
+%token <val> INTCONST
+%token <val> CHARCONST
+// TODO: figure out how to safely alloc/dealloc this (store a pointer to a const strings table?)
 %token STRING_LITERAL
 
 /* %token PUNCTUATOR */
@@ -32,6 +41,20 @@
 %token ELSE
 %token FOR
 %token RETURN
+
+%type <val> constant
+%type <sym> primary_expression
+%type <sym> postfix_expression
+%type <sym> unary_expression
+%type <sym> multiplicative_expression
+%type <sym> additive_expression
+%type <sym> relational_expression
+%type <sym> equality_expression
+%type <sym> logical_AND_expression
+%type <sym> logical_OR_expression
+%type <sym> conditional_expression
+%type <sym> assignment_expression
+%type <sym> expression 
 
 %start translation_unit
 

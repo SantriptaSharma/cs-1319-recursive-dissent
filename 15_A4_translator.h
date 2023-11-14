@@ -63,7 +63,7 @@ typedef struct _Symbol {
 } Symbol;
 
 Symbol *SymLookup(const char *name);
-Symbol *GenTemp();
+Symbol *GenTemp(PRIMITIVE_TYPE type);
 void SymInsert(Symbol *sym);
 void SymFree(Symbol *sym);
 void SymDispl(Symbol *sym);
