@@ -15,6 +15,25 @@ typedef struct _Addr {
 	};
 } Addr;
 
+// Used for true, false, and next lists within symbols
+typedef struct _QuadList {
+	int quad_index;
+	struct _QuadList *next;
+} QuadList;
+
+extern int existing_lists_size, existing_lists_capacity;
+extern QuadList *existing_lists;
+
+void InitLists();
+void AddList(QuadList *list);
+void DestroyLists();
+
+QuadList *MakeList(int ind);
+void Insert(QuadList* list, int ind);
+QuadList *Merge(QuadList *list1, QuadList *list2);
+void Backpatch(QuadList *list, int dest);
+void FreeList(QuadList *list);
+
 // TODO: remove not if assignment finally does not ask for it, a couple places to remove from
 typedef struct {
 	enum OPCODE {ADD, SUB, MUL, DIV, MOD, MOV, POS, NEG, ADDR, DEREF, JMP, JIF, JNT, 
@@ -26,7 +45,7 @@ extern int quads_size, quads_capacity;
 extern Quad *quads;
 
 #define AImm(x) ((Addr){IMMEDIATE, .imm = x})
-#define ASym(x) ((Addr){SYMBOL_A, .sym = x})
+#define ASym(x) ((Addr){SYMBOL_A, .sym = x.sym})
 
 void Emit(Quad q);
 
@@ -52,6 +71,7 @@ typedef struct _SymbolTable {
 	struct _SymbolTable *parent;
 	struct _Symbol *sym_head, *sym_tail;
 	int temp_count;
+	int offset;
 } SymbolTable;
 
 extern SymbolTable glb_table, *current_table;
@@ -98,5 +118,12 @@ Symbol *GenTemp();
 void SymInsert(Symbol *sym);
 void SymFree(Symbol *sym);
 void SymDispl(Symbol *sym);
+
+typedef struct _ExprAttrib {
+	Symbol *sym;
+	QuadList *truelist, *falselist;
+} ExprAttrib;
+
+#define PURE_EXPR(x) ((ExprAttrib){.sym = x, .truelist = NULL, .falselist = NULL})
 
 #endif

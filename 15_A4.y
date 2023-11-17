@@ -13,14 +13,14 @@
 %}
 
 %union {
-	Symbol *sym;
+	ExprAttrib expr;
 	const char *string;
 	int val;	
 }
 
 /* %token KEYWORD */
 
-%token <sym> IDENTIFIER
+%token <expr> IDENTIFIER
 %token <val> INTCONST
 %token <val> CHARCONST
 // TODO: figure out how to safely alloc/dealloc this (store a pointer to a const strings table?)
@@ -43,18 +43,18 @@
 %token RETURN
 
 %type <val> constant
-%type <sym> primary_expression
-%type <sym> postfix_expression
-%type <sym> unary_expression
-%type <sym> multiplicative_expression
-%type <sym> additive_expression
-%type <sym> relational_expression
-%type <sym> equality_expression
-%type <sym> logical_AND_expression
-%type <sym> logical_OR_expression
-%type <sym> conditional_expression
-%type <sym> assignment_expression
-%type <sym> expression 
+%type <expr> primary_expression
+%type <expr> postfix_expression
+%type <expr> unary_expression
+%type <expr> multiplicative_expression
+%type <expr> additive_expression
+%type <expr> relational_expression
+%type <expr> equality_expression
+%type <expr> logical_AND_expression
+%type <expr> logical_OR_expression
+%type <expr> conditional_expression
+%type <expr> assignment_expression
+%type <expr> expression 
 
 %start translation_unit
 
@@ -66,7 +66,7 @@ constant:
 
 primary_expression:
 	IDENTIFIER
-	| constant {$$ = GenTemp(); Emit(Mov(ASym($$), AImm($1)));}
+	| constant {$$ = PURE_EXPR(GenTemp()); Emit(Mov(ASym($$), AImm($1)));}
 	| STRING_LITERAL {
 		// TODO: figure out string storage
 		log("primary-expression")
@@ -77,7 +77,7 @@ postfix_expression:
 	primary_expression
 	| postfix_expression '[' expression ']' {
 		// TODO: add error detection, make sure $1 is a pointer
-		$$ = GenTemp(); Emit(IndexRead(ASym($$), ASym($1), ASym($3)));
+		$$ = PURE_EXPR(GenTemp()); Emit(IndexRead(ASym($$), ASym($1), ASym($3)));
 	}
 	| postfix_expression '(' argument_expression_list ')' {
 		// TODO: call, validate number and type of params
@@ -101,22 +101,22 @@ argument_expression_list:
 
 unary_expression:
 	postfix_expression
-	| '&' unary_expression {$$ = GenTemp(); Emit(UnaryOp(ADDR, ASym($$), ASym($2)));}
-	| '*' unary_expression {$$ = GenTemp(); Emit(UnaryOp(DEREF, ASym($$), ASym($2)));}
-	| '+' unary_expression {$$ = GenTemp(); Emit(UnaryOp(POS, ASym($$), ASym($2)));}
-	| '-' unary_expression {$$ = GenTemp(); Emit(UnaryOp(NEG, ASym($$), ASym($2)));}
+	| '&' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(ADDR, ASym($$), ASym($2)));}
+	| '*' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(DEREF, ASym($$), ASym($2)));}
+	| '+' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(POS, ASym($$), ASym($2)));}
+	| '-' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(NEG, ASym($$), ASym($2)));}
 	| '!' unary_expression {$$ = $2}
 
 multiplicative_expression:
 	unary_expression
-	| multiplicative_expression '*' unary_expression {$$ = GenTemp(); Emit(BinOp(MUL, ASym($$), ASym($1), ASym($3)));}
-	| multiplicative_expression '/' unary_expression {$$ = GenTemp(); Emit(BinOp(DIV, ASym($$), ASym($1), ASym($3)));}
-	| multiplicative_expression '%' unary_expression {$$ = GenTemp(); Emit(BinOp(MOD, ASym($$), ASym($1), ASym($3)));}
+	| multiplicative_expression '*' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(MUL, ASym($$), ASym($1), ASym($3)));}
+	| multiplicative_expression '/' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(DIV, ASym($$), ASym($1), ASym($3)));}
+	| multiplicative_expression '%' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(MOD, ASym($$), ASym($1), ASym($3)));}
 
 additive_expression:
 	multiplicative_expression
-	| additive_expression '+' multiplicative_expression {$$ = GenTemp(); Emit(BinOp(ADD, ASym($$), ASym($1), ASym($3)));}
-	| additive_expression '-' multiplicative_expression {$$ = GenTemp(); Emit(BinOp(SUB, ASym($$), ASym($1), ASym($3)));}
+	| additive_expression '+' multiplicative_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(ADD, ASym($$), ASym($1), ASym($3)));}
+	| additive_expression '-' multiplicative_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(SUB, ASym($$), ASym($1), ASym($3)));}
 
 relational_expression:
 	additive_expression

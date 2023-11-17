@@ -36,8 +36,84 @@ static const int Sizes[] = {
 	[INT_T] size_of_int, [CHAR_T] size_of_char
 };
 
-void Emit(Quad q)
-{
+int existing_lists_size = 0, existing_lists_capacity = 64;
+QuadList *existing_lists;
+
+void InitLists() {
+	existing_lists = calloc(existing_lists_capacity, sizeof(*existing_lists));
+}
+
+void AddList(QuadList *list) {
+	if (existing_lists_size == existing_lists_capacity) {
+		existing_lists_capacity *= 2;
+		existing_lists = realloc(existing_lists, existing_lists_capacity * sizeof(*existing_lists));
+	}
+
+	existing_lists[existing_lists_size++] = *list;
+}
+
+void DestroyLists() {
+	for (int i = 0; i < existing_lists_size; i++) {
+		FreeList(&existing_lists[i]);
+	}
+
+	free(existing_lists);
+}
+
+QuadList *MakeList(int ind) {
+	QuadList *list = malloc(sizeof(*list));
+	list->quad_index = ind;
+	list->next = NULL;
+
+	AddList(list);
+
+	return list;
+}
+
+void Insert(QuadList *list, int ind) {
+	QuadList *new = malloc(sizeof(*new));
+	new->quad_index = ind;
+	new->next = list->next;
+	list->next = new;
+}
+
+QuadList *Merge(QuadList *list1, QuadList *list2) {
+	QuadList *new = MakeList(-1);
+
+	QuadList *it = list1;
+	while (it != NULL) {
+		Insert(new, it->quad_index);
+		it = it->next;
+	}
+
+	it = list2;
+
+	while (it != NULL) {
+		Insert(new, it->quad_index);
+		it = it->next;
+	}
+
+	return new;
+}
+
+void Backpatch(QuadList *list, int dest) {
+	QuadList *it = list;
+	while (it != NULL) {
+		if (it->quad_index != -1) quads[it->quad_index].rd.imm = dest;
+		it = it->next;
+	}
+}
+
+void FreeList(QuadList *list) {
+	QuadList *it = list;
+	while (it != NULL) {
+		QuadList *next = it->next;
+		free(it);
+		it = next;
+	}
+}
+
+void Emit(Quad q) {
 	if (quads_size == quads_capacity) {
 		quads_capacity *= 2;
 		quads = realloc(quads, quads_capacity * sizeof(*quads));
@@ -301,6 +377,11 @@ void SymInsert(Symbol *sym)
 		current_table->sym_tail->next = sym;
 		current_table->sym_tail = sym;
 	}
+
+	current_table->sym_tail->next = NULL;
+
+	sym->offset = current_table->offset;
+	current_table->offset += sym->size;
 }
 
 void SymFree(Symbol *sym)
@@ -333,6 +414,7 @@ void SymDispl(Symbol *sym)
 
 
 int main() {
+	InitLists();
 	InitQuads();
 	InitTables();
 
@@ -345,5 +427,6 @@ int main() {
 
 	FreeTables();
 	FreeQuads();
+	DestroyLists();
 	return 0;
 }
