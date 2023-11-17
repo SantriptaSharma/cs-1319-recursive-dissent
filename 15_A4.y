@@ -105,7 +105,7 @@ unary_expression:
 	| '*' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(DEREF, ASym($$), ASym($2)));}
 	| '+' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(POS, ASym($$), ASym($2)));}
 	| '-' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(NEG, ASym($$), ASym($2)));}
-	| '!' unary_expression {$$ = $2}
+	| '!' unary_expression {$$ = $2;}
 
 multiplicative_expression:
 	unary_expression

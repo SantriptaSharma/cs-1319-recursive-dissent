@@ -259,8 +259,10 @@ void Destroy_SymbolTable(SymbolTable *table)
 		sym = next;
 	}
 
-	if (table->scope != GLOBAL) free((void *) table->name);
-	free(table);
+	if (table->scope != GLOBAL) {
+		free((void *) table->name);
+		free(table);
+	}
 }
 
 void SymTableDispl(SymbolTable *table)

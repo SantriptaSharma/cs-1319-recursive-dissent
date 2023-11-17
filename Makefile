@@ -1,7 +1,7 @@
 CC=gcc
 l=flex
 yy=bison
-CFLAGS=-Werror -lfl
+CFLAGS=-Werror -lfl -g
 
 o=translator
 lx=lexer
