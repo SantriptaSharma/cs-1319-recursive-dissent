@@ -16,9 +16,7 @@
 
 %union {
 	ExprAttrib expr;
-	struct _ArgList {
-		ExprAttrib value;
-	} argument_list;
+	struct arg_expr_list *argument_list;
 	const char *string;
 	int val;
 
@@ -27,7 +25,7 @@
 
 /* %token KEYWORD */
 
-%token <expr> IDENTIFIER
+%token <string> IDENTIFIER
 %token <val> INTCONST
 %token <val> CHARCONST
 // TODO: figure out how to safely alloc/dealloc this (store a pointer to a const strings table, using initial value of a symbol?)
@@ -64,7 +62,7 @@
 %type <expr> expression 
 %type <argument_list> argument_expression_list
 
-%type <type_spec> type-specifier
+%type <type_spec> type_specifier
 
 %start translation_unit
 
@@ -78,7 +76,12 @@ constant:
 	| CHARCONST
 
 primary_expression:
-	IDENTIFIER
+	IDENTIFIER {Symbol *sym = SymLookup($1); if (sym == NULL) {
+		char err[384];
+		sprintf(err, "Symbol not found: %s", $1);
+		yyerror(err);
+		YYABORT;
+	} else $$ = PURE_EXPR(sym);}
 	| constant {$$ = PURE_EXPR(GenTemp()); Emit(Mov(ASym($$), AImm($1)));}
 	| STRING_LITERAL {
 		// TODO: figure out string storage
@@ -114,7 +117,7 @@ postfix_expression:
 
 argument_expression_list:
 	assignment_expression {$$ = MakeArgList($1);}
-	| argument_expression_list ',' assignment_expression {Join($1, $3); $$ = $1;})}
+	| argument_expression_list ',' assignment_expression {Join($1, $3); $$ = $1;}
 
 // TODO: write out relational actions using dummy keys
 

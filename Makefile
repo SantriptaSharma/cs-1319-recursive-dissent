@@ -9,9 +9,14 @@ lx=lexer
 team=15
 assignment=4
 
+testfile=testthing.nc
+
 fname=$(team)_A$(assignment)
 
 build: $(o)
+
+test: build
+	./$(o) < $(testfile)
 
 $(o): $(fname)_translator.o $(fname).tab.o $(lx).o
 	$(CC) -o $@ $^ $(CFLAGS)

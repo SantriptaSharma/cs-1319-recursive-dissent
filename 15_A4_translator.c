@@ -4,7 +4,7 @@
 #include "15_A4_translator.h"
 
 extern int yyparse();
-extern void yyerror(const char *err);
+extern void yyerror(char *s);
 
 const unsigned int size_of_char = 1;
 const unsigned int size_of_int = 4;
@@ -14,11 +14,6 @@ int quads_size = 0, quads_capacity = 64;
 Quad *quads;
 
 SymbolTable glb_table, *current_table;
-
-struct arg_expr_list {
-	ExprAttrib expr;
-	struct arg_expr_list *next;
-};
 
 struct arg_expr_list* MakeArgList (ExprAttrib expr) {
 	struct arg_expr_list *list = malloc(sizeof(*list));
@@ -31,8 +26,6 @@ void Join (struct arg_expr_list *list, ExprAttrib expr) {
 	while (list->next != NULL) {list = list->next;}
 	list->next = MakeArgList(expr);
 }
-
-
 
 static void InitQuads()
 {
@@ -433,7 +426,6 @@ void SymDispl(Symbol *sym)
 	printf("@%d, ", sym->offset);
 	printf("Inner table %s\n", sym->inner_table ? sym->inner_table->name : "NULL");
 }
-
 
 int main() {
 	InitLists();

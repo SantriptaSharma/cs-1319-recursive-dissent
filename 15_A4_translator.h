@@ -54,6 +54,13 @@ void Emit(Quad q);
 #define UnaryOp(op, dest, opr) ((Quad){op, opr, AImm(0), dest})
 #define Jump(dest) ((Quad){JMP, AImm(0), AImm(0), dest})
 #define JumpIf(dest, cond) ((Quad){JIF, cond, AImm(0), dest})
+#define JumpIfNot(dest, cond) ((Quad){JNT, cond, AImm(0), dest})
+#define JumpIfLess(dest, op1, op2) ((Quad){JLT, op1, op2, dest})
+#define JumpIfGreater(dest, op1, op2) ((Quad){JGT, op1, op2, dest})
+#define JumpIfEqual(dest, op1, op2) ((Quad){JEQ, op1, op2, dest})
+#define JumpIfNotEqual(dest, op1, op2) ((Quad){JNE, op1, op2, dest})
+#define JumpIfLessEqual(dest, op1, op2) ((Quad){JLE, op1, op2, dest})
+#define JumpIfGreaterEqual(dest, op1, op2) ((Quad){JGE, op1, op2, dest})
 #define Param(source) ((Quad){PAR, source, AImm(0), AImm(0)})
 #define Call(func) ((Quad){CAL, AImm(0), AImm(0), func})
 #define CallAss(dest, func) ((Quad){CAL, dest, AImm(0), func})
@@ -92,7 +99,7 @@ typedef struct _Type {
 			int size;
 		} array;
 		struct {
-			struct _Type return_type;
+			struct _Type *return_type;
 			struct _Type *param_list;
 		} func;
 	};
@@ -125,5 +132,13 @@ typedef struct _ExprAttrib {
 } ExprAttrib;
 
 #define PURE_EXPR(x) ((ExprAttrib){.sym = x, .truelist = NULL, .falselist = NULL})
+
+struct arg_expr_list {
+	ExprAttrib expr;
+	struct arg_expr_list *next;
+};
+
+struct arg_expr_list* MakeArgList (ExprAttrib expr);
+void Join (struct arg_expr_list *list, ExprAttrib expr);
 
 #endif

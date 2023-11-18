@@ -26,7 +26,7 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 "for" { return FOR; }
 "return" { return RETURN; }
 
-{IDENT} { return IDENTIFIER;}
+{IDENT} { yylval.string = yytext; return IDENTIFIER;}
 {INTCONST} { yylval.val = atoi(yytext); return INTCONST; }
 
 	/* TODO: Account for multibyte character constants (shift and accumulate) */
