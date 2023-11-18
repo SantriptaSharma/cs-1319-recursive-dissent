@@ -1,4 +1,6 @@
 %{
+#include <string.h>
+#include <stdlib.h>
 #ifndef NO_YY
 	#include "15_A4_translator.h"
 	#include "15_A4.tab.h"
@@ -33,7 +35,15 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 {CHARCONST} { 
 	yylval.val = (int) yytext[1]; return CHARCONST; 
 }
-{STRLIT} { return STRING_LITERAL;}  
+{STRLIT} {
+	size_t len = strlen(yytext);
+	char *val = malloc(len - 1);
+
+	memcpy(val, yytext + 1, len - 2);
+	val[len - 2] = '\0';
+
+	yylval.string = val; return STRING_LITERAL;
+}  
 
 "->" { return ARROW; }
 ">=" { return GEQ; }

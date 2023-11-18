@@ -17,7 +17,7 @@
 %union {
 	ExprAttrib expr;
 	struct arg_expr_list *argument_list;
-	const char *string;
+	char *string;
 	int val;
 
 	enum { VOID_TOK, CHAR_TOK, INT_TOK } type_spec;
@@ -28,8 +28,7 @@
 %token <string> IDENTIFIER
 %token <val> INTCONST
 %token <val> CHARCONST
-// TODO: figure out how to safely alloc/dealloc this (store a pointer to a const strings table, using initial value of a symbol?)
-%token STRING_LITERAL
+%token <string> STRING_LITERAL
 
 /* %token PUNCTUATOR */
 %token ARROW
@@ -83,10 +82,7 @@ primary_expression:
 		YYABORT;
 	} else $$ = PURE_EXPR(sym);}
 	| constant {$$ = PURE_EXPR(GenTemp()); Emit(Mov(ASym($$), AImm($1)));}
-	| STRING_LITERAL {
-		// TODO: figure out string storage
-		log("primary-expression")
-	}
+	| STRING_LITERAL {$$ = PURE_EXPR(StringLookupOrInsert($1)); free($1);}
 	| '(' expression ')' {$$ = $2;}
 
 postfix_expression:

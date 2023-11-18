@@ -121,6 +121,7 @@ typedef struct _Symbol {
 
 Symbol *SymLookup(const char *name);
 Symbol *SymLookupOrInsert(const char *name);
+Symbol *StringLookupOrInsert(const char *str);
 Symbol *GenTemp();
 void SymInsert(Symbol *sym);
 void SymFree(Symbol *sym);

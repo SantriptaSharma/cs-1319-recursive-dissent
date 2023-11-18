@@ -368,6 +368,45 @@ Symbol *SymLookupOrInsert(const char *name) {
 	return sym;
 }
 
+Symbol *StringLookupOrInsert(const char *str) {
+	size_t len = strlen(str);
+	char *name = malloc(len + 7);
+	
+	sprintf(name, "__str_%s", str);
+
+	SymbolTable *c = current_table;
+	current_table = &glb_table;
+
+	Symbol *sym = SymLookup(name);
+
+	char new = sym == NULL;
+
+	if (new) {
+		sym = malloc(sizeof(*sym));
+		
+		sym->name = name;
+		sym->type = (Type) {
+			.kind = ARRAY_T,
+			.array = {
+				.base = CHAR_T,
+				.size = len + 1
+			}
+		};
+		sym->initial_value = 0;
+		sym->size = sym->type.array.size;
+		sym->offset = 0;
+		sym->inner_table = NULL;
+		sym->next = NULL;
+
+		SymInsert(sym);
+	}
+
+	if (!new) free(name);
+
+	current_table = c;
+	return sym;
+}
+
 Symbol *GenTemp()
 {
 	char name[16];
