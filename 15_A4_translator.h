@@ -84,7 +84,7 @@ typedef enum {CHAR_T, INT_T} PRIMITIVE_TYPE;
 
 typedef struct _Type {
 	// needs some kind of types table + hashing mechanism to reuse types, instead of always creating new ones (wont implement for now)
-	enum KIND_T {PRIMITIVE_PTR, TEMP_T, PRIMITIVE_T, ARRAY_T, FUNC_T} kind;
+	enum KIND_T {PRIMITIVE_PTR, ARRAY_PTR, TEMP_T, PRIMITIVE_T, ARRAY_T, FUNC_T, VOID_T} kind;
 	union {
 		PRIMITIVE_TYPE primitive;
 		struct {
@@ -92,7 +92,7 @@ typedef struct _Type {
 			int size;
 		} array;
 		struct {
-			struct _Type *return_type;
+			struct _Type return_type;
 			struct _Type *param_list;
 		} func;
 	};

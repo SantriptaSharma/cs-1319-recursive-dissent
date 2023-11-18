@@ -12,10 +12,17 @@
 	void yyerror(char *s);
 %}
 
+/*  */
+
 %union {
 	ExprAttrib expr;
+	struct _ArgList {
+		ExprAttrib value;
+	} argument_list;
 	const char *string;
-	int val;	
+	int val;
+
+	enum { VOID_TOK, CHAR_TOK, INT_TOK } type_spec;
 }
 
 /* %token KEYWORD */
@@ -23,7 +30,7 @@
 %token <expr> IDENTIFIER
 %token <val> INTCONST
 %token <val> CHARCONST
-// TODO: figure out how to safely alloc/dealloc this (store a pointer to a const strings table?)
+// TODO: figure out how to safely alloc/dealloc this (store a pointer to a const strings table, using initial value of a symbol?)
 %token STRING_LITERAL
 
 /* %token PUNCTUATOR */
@@ -55,11 +62,17 @@
 %type <expr> conditional_expression
 %type <expr> assignment_expression
 %type <expr> expression 
+%type <argument_list> argument_expression_list
+
+%type <type_spec> type-specifier
 
 %start translation_unit
 
 %%
 /* expressions */
+/* TODO: validate types and add implicit conversions 
+	Compatible Types: (int, char, temp, array, any_ptr)
+*/
 constant:
 	INTCONST
 	| CHARCONST
@@ -93,9 +106,15 @@ postfix_expression:
 	}
 
 // TODO: build assignment expression lists
+// define MakeArgList (takes an argument expression and returns an argument expression list containing the argument expression)
+
+// define Join (takes an argument expression list and an argument expression, and appends the argument expression to the end of the argument expression list)
+
+// define the above as linked lists
+
 argument_expression_list:
-	assignment_expression {log("argument-expression-list")}
-	| argument_expression_list ',' assignment_expression {log("argument-expression-list")}
+	assignment_expression {$$ = MakeArgList($1);}
+	| argument_expression_list ',' assignment_expression {Join($1, $3); $$ = $1;})}
 
 // TODO: write out relational actions using dummy keys
 
@@ -128,7 +147,7 @@ relational_expression:
 equality_expression:
 	relational_expression
 	| equality_expression CEQ relational_expression {log("equality-expression")}
-  	| equality_expression NEQ relational_expression {log("equality-expression")}
+	| equality_expression NEQ relational_expression {log("equality-expression")}
 
 logical_AND_expression:
 	equality_expression
@@ -159,9 +178,9 @@ init_declarator:
 	| declarator '=' initalizer {log("init-declarator")}
 	
 type_specifier:
-	VOID {log("type-specifier")}
-	| CHAR {log("type-specifier")}
-	| INT {log("type-specifier")}
+	VOID {$$ = VOID_TOK;}
+	| CHAR {$$ = CHAR_TOK;}
+	| INT {$$ = INT_TOK;}
 
 declarator:
 	pointer direct_declarator {log("declarator")}
@@ -174,7 +193,7 @@ direct_declarator:
 	| IDENTIFIER '(' ')' {log("direct-declarator")}
 
 pointer:
-	'*' {log("pointer")}
+	'*'
 
 parameter_list:
 	parameter_declaration {log("parameter-list")}

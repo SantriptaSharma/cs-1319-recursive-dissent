@@ -15,6 +15,24 @@ Quad *quads;
 
 SymbolTable glb_table, *current_table;
 
+struct arg_expr_list {
+	ExprAttrib expr;
+	struct arg_expr_list *next;
+};
+
+struct arg_expr_list* MakeArgList (ExprAttrib expr) {
+	struct arg_expr_list *list = malloc(sizeof(*list));
+	list->expr = expr;
+	list->next = NULL;
+	return list;
+}
+
+void Join (struct arg_expr_list *list, ExprAttrib expr) {
+	while (list->next != NULL) {list = list->next;}
+	list->next = MakeArgList(expr);
+}
+
+
 
 static void InitQuads()
 {
@@ -288,6 +306,7 @@ int GetSize(Type type) {
 		break;
 
 		case PRIMITIVE_PTR:
+		case ARRAY_PTR:
 			return size_of_pointer;
 		break;
 
@@ -296,6 +315,7 @@ int GetSize(Type type) {
 		break;
 		
 		case FUNC_T:
+		case VOID_T:
 			return 0;
 		break;
 
@@ -307,8 +327,6 @@ int GetSize(Type type) {
 
 void TypeFree(Type *type)
 {
-	if (type->kind == PRIMITIVE_T) return;
-
 	if (type->kind == FUNC_T) {
 		TypeFree(type->func.return_type);
 		
@@ -399,7 +417,9 @@ void SymFree(Symbol *sym)
 static const char *TypeSym[] = {
 	[PRIMITIVE_T] "PRIMITIVE_T",
 	[PRIMITIVE_PTR] "PRIMITIVE_PTR",
+	[ARRAY_PTR] "ARRAY_PTR",
 	[TEMP_T] "TEMP_T",
+	[VOID_T] "VOID_T",
 	[ARRAY_T] "ARRAY_T",
 	[FUNC_T] "FUNC_T"
 };
