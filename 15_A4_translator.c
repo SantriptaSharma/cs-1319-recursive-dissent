@@ -275,6 +275,12 @@ void SymTableDispl(SymbolTable *table)
 		SymDispl(sym);
 		sym = sym->next;
 	}
+
+	sym = table->sym_head;
+	while (sym) {
+		if (sym->inner_table) SymTableDispl(sym->inner_table);
+		sym = sym->next;
+	}
 }
 
 // Get size of an object of this type on the virtual stack
@@ -334,6 +340,8 @@ Symbol *SymInit(enum KIND_T kind) {
 			sym->type.func.arg_list = NULL;
 		break;
 	}
+
+	return sym;
 }
 
 Symbol *SymLookup(const char *name) {
@@ -461,7 +469,7 @@ static const char *TypeSym[] = {
 void SymDispl(Symbol *sym)
 {
 	printf("Symbol %s: ", sym->name);
-	printf("%s, ", TypeSym[sym->type.kind]);
+	printf("kind %s, ", TypeSym[sym->type.kind]);
 	printf("Initial value %d, ", sym->initial_value);
 	printf("%d bytes, ", sym->size);
 	printf("@%d, ", sym->offset);
@@ -482,6 +490,8 @@ void InsertArg(ArgList *list,  ArgListElem elem) {
 
 void DestroyArgList(ArgList *list) {
 	while (list != NULL) {
+		// name is freed by associated symbol
+
 		ArgList *next = list->next;
 		free(list);
 		list = next;

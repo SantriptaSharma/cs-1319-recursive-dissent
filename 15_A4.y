@@ -21,7 +21,11 @@ TODO: write everything up in assignment pdf
 
 %union {
 	ExprAttrib expr;
-	Symbol *decl;
+	struct _decl_attrib {
+		Symbol *sym;
+		ExprAttrib init;
+		char has_init;
+	} decl;
 	ArgList *argument_list;
 	ArgListElem arg;
 	char *string;
@@ -176,29 +180,32 @@ expression:
 	assignment_expression
 
 /* Declarations */
-
+// TODO: test this, seems to be complete, build a debug printer for symbols
 declaration:
 	type_specifier init_declarator ';' {
 		$$ = $2;
 
-		switch ($$->type.kind) {
+		switch ($$.sym->type.kind) {
 			case PRIMITIVE_T:
-				$$->type.primitive = $1;
 			case PRIMITIVE_PTR:
-				$$->type.primitive = $1;
+				$$.sym->type.primitive = $1;
 			break;
 
 			case ARRAY_T:
-				$$->type
-			break;
-
 			case ARRAY_PTR:
-
+				$$.sym->type.array.base = $1;
 			break;
 
 			case FUNC_T:
-
+				$$.sym->type.func.return_type->primitive = $1;
 			break;
+		}
+
+		SymInsert($$.sym);
+
+		// TODO: verify types before emitting assignment
+		if ($$.has_init == 1) {
+			Emit(Mov(ASym($$), ASym($$.init)));
 		}
 	}
 
@@ -207,12 +214,13 @@ init_declarator:
 	| declarator '=' initializer {
 		$$ = $1;
 
-		if ($$->type.kind == FUNC_T) {
+		if ($$.sym->type.kind == FUNC_T) {
 			yyerror("function can't be initialized with assignment expression");
 			YYABORT;
 		}
 
-		// TODO: validate type and emit assignment
+		$$.init = $3;
+		$$.has_init = 1;
 	}
 	
 type_specifier:
@@ -224,17 +232,17 @@ declarator:
 	pointer direct_declarator {
 		$$ = $2;
 
-		switch ($$->type.kind) {
+		switch ($$.sym->type.kind) {
 			case PRIMITIVE_T:
-				$$->type.kind = PRIMITIVE_PTR;
+				$$.sym->type.kind = PRIMITIVE_PTR;
 			break;
 
 			case ARRAY_T:
-				$$->type.kind = ARRAY_PTR;
+				$$.sym->type.kind = ARRAY_PTR;
 			break;
 
 			case  FUNC_T:
-				$$->type.func.return_type->kind = PRIMITIVE_PTR;
+				$$.sym->type.func.return_type->kind = PRIMITIVE_PTR;
 			break;
 		}
 	}
@@ -242,25 +250,46 @@ declarator:
 
 direct_declarator:
 	IDENTIFIER {
-		$$ = SymInit(PRIMITIVE_T);
-		$$->name = strdup($1);
+		$$.sym = SymInit(PRIMITIVE_T);
+		$$.sym->name = strdup($1);
 	}
 	| IDENTIFIER '[' INTCONST ']' {
-		$$ = SymInit(ARRAY_T);
-		$$->type.array.size = $3;
-		$$->name = strdup($1);
+		$$.sym = SymInit(ARRAY_T);
+		$$.sym->type.array.size = $3;
+		$$.sym->name = strdup($1);
 	}
 	| IDENTIFIER '(' parameter_list ')' {
-		$$ = SymInit(FUNC_T);
-		$$->type.func.arg_list = $3;
-		$$->type.func.return_type = calloc(1, sizeof(*$$->type.func.return_type));
-		$$->name = strdup($1);
+		$$.sym = SymInit(FUNC_T);
+		$$.sym->type.func.arg_list = $3;
+		$$.sym->type.func.return_type = calloc(1, sizeof(*$$.sym->type.func.return_type));
+		$$.sym->name = strdup($1);
+		$$.sym->inner_table = Create_SymbolTable($$.sym->name, FUNC, &glb_table);
+
+		SymbolTable *t = current_table;
+		current_table = $$.sym->inner_table;
+
+		ArgList *it = $$.sym->type.func.arg_list;
+
+		while (it != NULL) {
+			Symbol *sym = SymInit(it->elem.decl.type.kind);
+
+			sym->name = it->elem.decl.name;
+			sym->type = it->elem.decl.type;
+			sym->size = GetSize(sym->type);
+
+			SymInsert(sym);
+
+			it = it->next;
+		}
+
+		current_table = t;
 	}
 	| IDENTIFIER '(' ')' {
-		$$ = SymInit(FUNC_T);
-		$$->type.func.arg_list = NULL;
-		$$->type.func.return_type = calloc(1, sizeof(*$$->type.func.return_type));
-		$$->name = strdup($1);
+		$$.sym = SymInit(FUNC_T);
+		$$.sym->type.func.arg_list = NULL;
+		$$.sym->type.func.return_type = calloc(1, sizeof(*$$.sym->type.func.return_type));
+		$$.sym->name = strdup($1);
+		$$.sym->inner_table = Create_SymbolTable($$.sym->name, FUNC, &glb_table);
 	}
 
 pointer:
@@ -273,11 +302,14 @@ parameter_list:
 parameter_declaration:
 	type_specifier pointer IDENTIFIER {
 		char *name = strdup($3);
-		$$ = ARG_DECL(prim2type($1), name); $$.kind = PRIMITIVE_PTR;
+		$$ = ARG_DECL(prim2type($1), name);
+		$$.decl.type.kind = PRIMITIVE_PTR;
 	}
-	| type_specifier IDENTIFIER {if($1 == VOID_T) {yyerror("void is zero-sized!"); YYABORT;} $$ = prim2type($1);}
-	| type_specifier pointer {$$ = prim2type($1); $$.kind = PRIMITIVE_PTR;}
-	| type_specifier {if($1 == VOID_T) {yyerror("void is zero-sized!"); YYABORT;} $$ = prim2type($1);}
+	| type_specifier IDENTIFIER {
+		if($1 == VOID_T) {yyerror("void is zero-sized!"); YYABORT;} 
+		char *name = strdup($2);
+		$$ = ARG_DECL(prim2type($1), name);
+	}
 
 initializer:
 	assignment_expression {log("initializer")}
