@@ -1,6 +1,7 @@
 %{
 	#include <stdio.h> 
 	#include <stdlib.h>
+	#include <string.h>
 
 	#include "15_A4_translator.h"
 
@@ -12,15 +13,21 @@
 	void yyerror(char *s);
 %}
 
-/*  */
+/* 
+TODO: go through all rules, make sure no rules just logging remain 
+TODO: write everything up in assignment pdf   
+*/
+
 
 %union {
 	ExprAttrib expr;
-	struct arg_expr_list *argument_list;
+	Symbol *decl;
+	ArgList *argument_list;
+	ArgListElem arg;
 	char *string;
 	int val;
 
-	enum { VOID_TOK, CHAR_TOK, INT_TOK } type_spec;
+	PRIMITIVE_TYPE type_spec;
 }
 
 /* %token KEYWORD */
@@ -62,6 +69,13 @@
 %type <argument_list> argument_expression_list
 
 %type <type_spec> type_specifier
+%type <decl> declaration
+%type <decl> init_declarator
+%type <decl> declarator
+%type <decl> direct_declarator
+%type <argument_list> parameter_list
+%type <arg> parameter_declaration
+%type <expr> initializer
 
 %start translation_unit
 
@@ -94,6 +108,7 @@ postfix_expression:
 	| postfix_expression '(' argument_expression_list ')' {
 		// TODO: call, validate number and type of params
 		log("postfix-expression")
+		DestroyArgList($3);
 	}
 	| postfix_expression '(' ')' {
 		// TODO: call, validate number and type of params
@@ -104,16 +119,9 @@ postfix_expression:
 		log("postfix-expression")
 	}
 
-// TODO: build assignment expression lists
-// define MakeArgList (takes an argument expression and returns an argument expression list containing the argument expression)
-
-// define Join (takes an argument expression list and an argument expression, and appends the argument expression to the end of the argument expression list)
-
-// define the above as linked lists
-
 argument_expression_list:
-	assignment_expression {$$ = MakeArgList($1);}
-	| argument_expression_list ',' assignment_expression {Join($1, $3); $$ = $1;}
+	assignment_expression {$$ = MakeArgList(ARG_EXPR($1));}
+	| argument_expression_list ',' assignment_expression {InsertArg($1, ARG_EXPR($3)); $$ = $1;}
 
 // TODO: write out relational actions using dummy keys
 
@@ -170,41 +178,108 @@ expression:
 /* Declarations */
 
 declaration:
-	type_specifier init_declarator ';' {log("declaration")}
+	type_specifier init_declarator ';' {
+		$$ = $2;
+
+		switch ($$->type.kind) {
+			case PRIMITIVE_T:
+				$$->type.primitive = $1;
+			case PRIMITIVE_PTR:
+				$$->type.primitive = $1;
+			break;
+
+			case ARRAY_T:
+				$$->type
+			break;
+
+			case ARRAY_PTR:
+
+			break;
+
+			case FUNC_T:
+
+			break;
+		}
+	}
 
 init_declarator:
-	declarator {log("init-declarator")}
-	| declarator '=' initalizer {log("init-declarator")}
+	declarator
+	| declarator '=' initializer {
+		$$ = $1;
+
+		if ($$->type.kind == FUNC_T) {
+			yyerror("function can't be initialized with assignment expression");
+			YYABORT;
+		}
+
+		// TODO: validate type and emit assignment
+	}
 	
 type_specifier:
-	VOID {$$ = VOID_TOK;}
-	| CHAR {$$ = CHAR_TOK;}
-	| INT {$$ = INT_TOK;}
+	VOID {$$ = VOID_T;}
+	| CHAR {$$ = CHAR_T;}
+	| INT {$$ = INT_T;}
 
 declarator:
-	pointer direct_declarator {log("declarator")}
-	| direct_declarator {log("declarator")}
+	pointer direct_declarator {
+		$$ = $2;
+
+		switch ($$->type.kind) {
+			case PRIMITIVE_T:
+				$$->type.kind = PRIMITIVE_PTR;
+			break;
+
+			case ARRAY_T:
+				$$->type.kind = ARRAY_PTR;
+			break;
+
+			case  FUNC_T:
+				$$->type.func.return_type->kind = PRIMITIVE_PTR;
+			break;
+		}
+	}
+	| direct_declarator
 
 direct_declarator:
-	IDENTIFIER {log("direct-declarator")}
-	| IDENTIFIER '[' INTCONST ']' {log("direct-declarator")}
-	| IDENTIFIER '(' parameter_list ')' {log("direct-declarator")}
-	| IDENTIFIER '(' ')' {log("direct-declarator")}
+	IDENTIFIER {
+		$$ = SymInit(PRIMITIVE_T);
+		$$->name = strdup($1);
+	}
+	| IDENTIFIER '[' INTCONST ']' {
+		$$ = SymInit(ARRAY_T);
+		$$->type.array.size = $3;
+		$$->name = strdup($1);
+	}
+	| IDENTIFIER '(' parameter_list ')' {
+		$$ = SymInit(FUNC_T);
+		$$->type.func.arg_list = $3;
+		$$->type.func.return_type = calloc(1, sizeof(*$$->type.func.return_type));
+		$$->name = strdup($1);
+	}
+	| IDENTIFIER '(' ')' {
+		$$ = SymInit(FUNC_T);
+		$$->type.func.arg_list = NULL;
+		$$->type.func.return_type = calloc(1, sizeof(*$$->type.func.return_type));
+		$$->name = strdup($1);
+	}
 
 pointer:
 	'*'
 
 parameter_list:
-	parameter_declaration {log("parameter-list")}
-	| parameter_list ',' parameter_declaration {log("parameter-list")}
+	parameter_declaration {$$ = MakeArgList($1);}
+	| parameter_list ',' parameter_declaration {InsertArg($1, $3); $$ = $1;}
 	
 parameter_declaration:
-	type_specifier pointer IDENTIFIER {log("parameter-declaration")}
-	| type_specifier IDENTIFIER {log("parameter-declaration")}
-	| type_specifier pointer {log("parameter-declaration")}
-	| type_specifier {log("parameter-declaration")}
+	type_specifier pointer IDENTIFIER {
+		char *name = strdup($3);
+		$$ = ARG_DECL(prim2type($1), name); $$.kind = PRIMITIVE_PTR;
+	}
+	| type_specifier IDENTIFIER {if($1 == VOID_T) {yyerror("void is zero-sized!"); YYABORT;} $$ = prim2type($1);}
+	| type_specifier pointer {$$ = prim2type($1); $$.kind = PRIMITIVE_PTR;}
+	| type_specifier {if($1 == VOID_T) {yyerror("void is zero-sized!"); YYABORT;} $$ = prim2type($1);}
 
-initalizer:
+initializer:
 	assignment_expression {log("initializer")}
 
 /* Statements */

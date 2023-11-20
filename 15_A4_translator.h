@@ -86,12 +86,15 @@ extern SymbolTable glb_table, *current_table;
 SymbolTable *Create_SymbolTable(const char *name, enum Scope scope, SymbolTable *parent);
 void Destroy_SymbolTable(SymbolTable *table);
 void SymTableDispl(SymbolTable *table);
+typedef enum { INT_T, CHAR_T, VOID_T } PRIMITIVE_TYPE;
 
-typedef enum {CHAR_T, INT_T} PRIMITIVE_TYPE;
+#define prim2type(x) ((Type){.kind = PRIMITIVE_T, .primitive = x})
+
+struct _ArgList;
 
 typedef struct _Type {
 	// needs some kind of types table + hashing mechanism to reuse types, instead of always creating new ones (wont implement for now)
-	enum KIND_T {PRIMITIVE_PTR, ARRAY_PTR, TEMP_T, PRIMITIVE_T, ARRAY_T, FUNC_T, VOID_T} kind;
+	enum KIND_T {PRIMITIVE_PTR, ARRAY_PTR, TEMP_T, PRIMITIVE_T, ARRAY_T, FUNC_T} kind;
 	union {
 		PRIMITIVE_TYPE primitive;
 		struct {
@@ -100,10 +103,9 @@ typedef struct _Type {
 		} array;
 		struct {
 			struct _Type *return_type;
-			struct _Type *param_list;
+			struct _ArgList *arg_list;
 		} func;
 	};
-	struct _Type *next;
 } Type;
 
 int GetSize(Type type);
@@ -119,6 +121,7 @@ typedef struct _Symbol {
 	struct _Symbol *next;
 } Symbol;
 
+Symbol *SymInit(enum KIND_T kind);
 Symbol *SymLookup(const char *name);
 Symbol *SymLookupOrInsert(const char *name);
 Symbol *StringLookupOrInsert(const char *str);
@@ -134,12 +137,27 @@ typedef struct _ExprAttrib {
 
 #define PURE_EXPR(x) ((ExprAttrib){.sym = x, .truelist = NULL, .falselist = NULL})
 
-struct arg_expr_list {
-	ExprAttrib expr;
-	struct arg_expr_list *next;
-};
+typedef struct _ArgListElem {
+	enum {EXPR, DECL} kind;
+	union {
+		ExprAttrib expr;
+		struct {
+			Type type;
+			const char *name;
+		} decl;
+	};
+} ArgListElem;
 
-struct arg_expr_list* MakeArgList (ExprAttrib expr);
-void Join (struct arg_expr_list *list, ExprAttrib expr);
+typedef struct _ArgList {
+	ArgListElem elem;
+	struct _ArgList *next;
+} ArgList;
+
+#define ARG_EXPR(x) ((ArgListElem){.kind = EXPR, .expr = x})
+#define ARG_DECL(t, n) ((ArgListElem){.kind = DECL, .decl = {t, n}})
+
+ArgList *MakeArgList(ArgListElem elem);
+void InsertArg(ArgList *list, ArgListElem elem);
+void DestroyArgList(ArgList *list);
 
 #endif

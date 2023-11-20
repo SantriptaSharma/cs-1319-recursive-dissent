@@ -15,18 +15,6 @@ Quad *quads;
 
 SymbolTable glb_table, *current_table;
 
-struct arg_expr_list* MakeArgList (ExprAttrib expr) {
-	struct arg_expr_list *list = malloc(sizeof(*list));
-	list->expr = expr;
-	list->next = NULL;
-	return list;
-}
-
-void Join (struct arg_expr_list *list, ExprAttrib expr) {
-	while (list->next != NULL) {list = list->next;}
-	list->next = MakeArgList(expr);
-}
-
 static void InitQuads()
 {
 	quads = calloc(quads_capacity, sizeof(*quads));
@@ -44,7 +32,7 @@ static const char *OpSym[] = {
 };
 
 static const int Sizes[] = {
-	[INT_T] size_of_int, [CHAR_T] size_of_char
+	[INT_T] size_of_int, [CHAR_T] size_of_char, [VOID_T] 0
 };
 
 int existing_lists_size = 0, existing_lists_capacity = 64;
@@ -308,7 +296,6 @@ int GetSize(Type type) {
 		break;
 		
 		case FUNC_T:
-		case VOID_T:
 			return 0;
 		break;
 
@@ -322,18 +309,34 @@ void TypeFree(Type *type)
 {
 	if (type->kind == FUNC_T) {
 		TypeFree(type->func.return_type);
-		
-		Type *param = type->func.param_list;
-		while (param) {
-			Type *next = param->next;
-			TypeFree(param);
-			param = next;
-		}
+		DestroyArgList(type->func.arg_list);
 	}
 }
 
-Symbol *SymLookup(const char *name)
-{
+Symbol *SymInit(enum KIND_T kind) {
+	Symbol *sym = calloc(1, sizeof(*sym));
+	sym->type.kind = kind;
+	
+	switch (kind) {
+		case PRIMITIVE_T:
+		case PRIMITIVE_PTR:
+		case ARRAY_PTR:
+		case TEMP_T:
+			sym->size = GetSize(sym->type);
+		break;
+
+		case ARRAY_T:
+			sym->size = GetSize(sym->type);
+		break;
+
+		case FUNC_T:
+			sym->type.func.return_type = NULL;
+			sym->type.func.arg_list = NULL;
+		break;
+	}
+}
+
+Symbol *SymLookup(const char *name) {
 	Symbol *sym = current_table->sym_head;
 	while (sym) {
 		if (!strcmp(sym->name, name))
@@ -416,7 +419,6 @@ Symbol *GenTemp()
 	sym->type.kind = TEMP_T;
 
 	sym->size = GetSize(sym->type);
-	printf("Generated temp %s of size %d\n", sym->name, sym->size);
 
 	return sym;
 }
@@ -464,6 +466,26 @@ void SymDispl(Symbol *sym)
 	printf("%d bytes, ", sym->size);
 	printf("@%d, ", sym->offset);
 	printf("Inner table %s\n", sym->inner_table ? sym->inner_table->name : "NULL");
+}
+
+ArgList *MakeArgList(ArgListElem elem) {
+	ArgList *list = malloc(sizeof(*list));
+	list->elem = elem;
+	list->next = NULL;
+	return list;
+}
+
+void InsertArg(ArgList *list,  ArgListElem elem) {
+	while (list->next != NULL) {list = list->next;}
+	list->next = MakeArgList(elem);
+}
+
+void DestroyArgList(ArgList *list) {
+	while (list != NULL) {
+		ArgList *next = list->next;
+		free(list);
+		list = next;
+	}
 }
 
 int main() {
