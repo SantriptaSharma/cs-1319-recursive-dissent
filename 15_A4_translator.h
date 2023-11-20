@@ -22,7 +22,7 @@ typedef struct _QuadList {
 } QuadList;
 
 extern int existing_lists_size, existing_lists_capacity;
-extern QuadList *existing_lists;
+extern QuadList **existing_lists;
 
 void InitLists();
 void AddList(QuadList *list);
@@ -110,6 +110,7 @@ typedef struct _Type {
 
 int GetSize(Type type);
 void TypeFree(Type *type);
+void TypeDispl(Type type);
 
 typedef struct _Symbol {
 	const char *name;

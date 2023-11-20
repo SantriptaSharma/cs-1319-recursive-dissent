@@ -36,7 +36,7 @@ static const int Sizes[] = {
 };
 
 int existing_lists_size = 0, existing_lists_capacity = 64;
-QuadList *existing_lists;
+QuadList **existing_lists;
 
 void InitLists() {
 	existing_lists = calloc(existing_lists_capacity, sizeof(*existing_lists));
@@ -48,12 +48,12 @@ void AddList(QuadList *list) {
 		existing_lists = realloc(existing_lists, existing_lists_capacity * sizeof(*existing_lists));
 	}
 
-	existing_lists[existing_lists_size++] = *list;
+	existing_lists[existing_lists_size++] = list;
 }
 
 void DestroyLists() {
 	for (int i = 0; i < existing_lists_size; i++) {
-		FreeList(&existing_lists[i]);
+		FreeList(existing_lists[i]);
 	}
 
 	free(existing_lists);
@@ -238,7 +238,7 @@ static void FreeTables()
 
 SymbolTable *Create_SymbolTable(const char *name, enum Scope scope, SymbolTable *parent)
 {
-	SymbolTable *table = malloc(sizeof(*table));
+	SymbolTable *table = calloc(1, sizeof(*table));
 
 	table->name = strdup(name);
 	table->scope = scope;
@@ -266,6 +266,7 @@ void Destroy_SymbolTable(SymbolTable *table)
 
 void SymTableDispl(SymbolTable *table)
 {
+	printf("----------------------------------------\n");
 	printf("Symbol table %s, ", table->name);
 	printf("Parent %s, ", table->parent ? table->parent->name : "NULL");
 	printf("Scope %s\n", table->scope == GLOBAL ? "GLOBAL" : table->scope == FUNC ? "FUNC" : "BLOCK");
@@ -275,6 +276,8 @@ void SymTableDispl(SymbolTable *table)
 		SymDispl(sym);
 		sym = sym->next;
 	}
+
+	printf("----------------------------------------\n");
 
 	sym = table->sym_head;
 	while (sym) {
@@ -317,6 +320,60 @@ void TypeFree(Type *type)
 		TypeFree(type->func.return_type);
 		DestroyArgList(type->func.arg_list);
 	}
+}
+
+static const char *TypeSym[] = {
+	[PRIMITIVE_T] "PRIMITIVE_T",
+	[PRIMITIVE_PTR] "PRIMITIVE_PTR",
+	[ARRAY_PTR] "ARRAY_PTR",
+	[TEMP_T] "TEMP_T",
+	[ARRAY_T] "ARRAY_T",
+	[FUNC_T] "FUNC_T"
+};
+
+static const char *PrimitiveSym[] = {
+	[INT_T] "INT_T",
+	[CHAR_T] "CHAR_T",
+	[VOID_T] "VOID_T"
+};
+
+void TypeDispl(Type t) {
+	printf("%s\t\t", TypeSym[t.kind]);
+	ArgList *arg = t.func.arg_list;
+
+	switch (t.kind) {
+		case PRIMITIVE_T:
+		case TEMP_T:
+			printf("%s", PrimitiveSym[t.primitive]);
+		break;
+
+		case PRIMITIVE_PTR:
+			printf("*%s", PrimitiveSym[t.primitive]);
+		break;
+
+		case ARRAY_PTR:
+			printf("*%s[%d]", PrimitiveSym[t.array.base], t.array.size);
+		break;
+
+		case ARRAY_T:
+			printf("%s[%d]", PrimitiveSym[t.array.base], t.array.size);
+		break;
+
+		case FUNC_T:
+			while (arg != NULL) {
+				if (arg->elem.decl.type.kind == PRIMITIVE_PTR || arg->elem.decl.type.kind == ARRAY_PTR)
+					printf("*");
+				printf("%s", PrimitiveSym[arg->elem.decl.type.primitive]);
+
+				arg = arg->next;
+
+				if (arg != NULL) printf(" * ");
+			}
+			printf("-> %s", PrimitiveSym[t.func.return_type->primitive]);
+		break;
+	}
+
+	printf("\t");
 }
 
 Symbol *SymInit(enum KIND_T kind) {
@@ -425,6 +482,7 @@ Symbol *GenTemp()
 
 	Symbol *sym = SymLookupOrInsert(name);
 	sym->type.kind = TEMP_T;
+	sym->type.primitive = INT_T;
 
 	sym->size = GetSize(sym->type);
 
@@ -456,23 +514,13 @@ void SymFree(Symbol *sym)
 	free(sym);
 }
 
-static const char *TypeSym[] = {
-	[PRIMITIVE_T] "PRIMITIVE_T",
-	[PRIMITIVE_PTR] "PRIMITIVE_PTR",
-	[ARRAY_PTR] "ARRAY_PTR",
-	[TEMP_T] "TEMP_T",
-	[VOID_T] "VOID_T",
-	[ARRAY_T] "ARRAY_T",
-	[FUNC_T] "FUNC_T"
-};
-
 void SymDispl(Symbol *sym)
 {
-	printf("Symbol %s: ", sym->name);
-	printf("kind %s, ", TypeSym[sym->type.kind]);
-	printf("Initial value %d, ", sym->initial_value);
-	printf("%d bytes, ", sym->size);
-	printf("@%d, ", sym->offset);
+	printf("Symbol %s\t\t", sym->name);
+	TypeDispl(sym->type);
+	printf("Initial value %d\t\t", sym->initial_value);
+	printf("%d bytes\t\t", sym->size);
+	printf("@%d\t\t", sym->offset);
 	printf("Inner table %s\n", sym->inner_table ? sym->inner_table->name : "NULL");
 }
 

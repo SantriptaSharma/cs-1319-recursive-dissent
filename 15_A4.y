@@ -96,6 +96,7 @@ primary_expression:
 	IDENTIFIER {Symbol *sym = SymLookup($1); if (sym == NULL) {
 		char err[384];
 		sprintf(err, "Symbol not found: %s", $1);
+		free($1);
 		yyerror(err);
 		YYABORT;
 	} else $$ = PURE_EXPR(sym);}
@@ -201,6 +202,13 @@ declaration:
 			break;
 		}
 
+		if (SymLookup($$.sym->name) != NULL) {
+			char err[384];
+			sprintf(err, "redeclaration of symbol %s", $$.sym->name);
+			yyerror(err);
+			YYABORT;
+		}
+
 		SymInsert($$.sym);
 
 		// TODO: verify types before emitting assignment
@@ -251,18 +259,18 @@ declarator:
 direct_declarator:
 	IDENTIFIER {
 		$$.sym = SymInit(PRIMITIVE_T);
-		$$.sym->name = strdup($1);
+		$$.sym->name = $1;
 	}
 	| IDENTIFIER '[' INTCONST ']' {
 		$$.sym = SymInit(ARRAY_T);
 		$$.sym->type.array.size = $3;
-		$$.sym->name = strdup($1);
+		$$.sym->name = $1;
 	}
 	| IDENTIFIER '(' parameter_list ')' {
 		$$.sym = SymInit(FUNC_T);
 		$$.sym->type.func.arg_list = $3;
 		$$.sym->type.func.return_type = calloc(1, sizeof(*$$.sym->type.func.return_type));
-		$$.sym->name = strdup($1);
+		$$.sym->name = $1;
 		$$.sym->inner_table = Create_SymbolTable($$.sym->name, FUNC, &glb_table);
 
 		SymbolTable *t = current_table;
@@ -288,7 +296,7 @@ direct_declarator:
 		$$.sym = SymInit(FUNC_T);
 		$$.sym->type.func.arg_list = NULL;
 		$$.sym->type.func.return_type = calloc(1, sizeof(*$$.sym->type.func.return_type));
-		$$.sym->name = strdup($1);
+		$$.sym->name = $1;
 		$$.sym->inner_table = Create_SymbolTable($$.sym->name, FUNC, &glb_table);
 	}
 
@@ -301,13 +309,13 @@ parameter_list:
 	
 parameter_declaration:
 	type_specifier pointer IDENTIFIER {
-		char *name = strdup($3);
+		char *name = $3;
 		$$ = ARG_DECL(prim2type($1), name);
 		$$.decl.type.kind = PRIMITIVE_PTR;
 	}
 	| type_specifier IDENTIFIER {
 		if($1 == VOID_T) {yyerror("void is zero-sized!"); YYABORT;} 
-		char *name = strdup($2);
+		char *name = $2;
 		$$ = ARG_DECL(prim2type($1), name);
 	}
 
