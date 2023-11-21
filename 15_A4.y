@@ -28,6 +28,7 @@ TODO: write everything up in assignment pdf
 	} decl;
 	ArgList *argument_list;
 	ArgListElem arg;
+	QuadList *next_list;
 	char *string;
 	int val;
 
@@ -199,17 +200,35 @@ declaration:
 
 			case FUNC_T:
 				$$.sym->type.func.return_type->primitive = $1;
+				
+				current_table = $$.sym->inner_table;
+
+				Symbol *sym = SymInit($$.sym->type.func.return_type->kind);
+				sym->name = strdup("__retval");
+				sym->type = *$$.sym->type.func.return_type;
+				sym->size = GetSize(sym->type);
+
+				SymInsert(sym);
+
+				current_table = &glb_table;
 			break;
 		}
 
-		if (SymLookup($$.sym->name) != NULL) {
+		Symbol *existing = SymLookup($$.sym->name);
+
+		if (existing != NULL && $$.sym->type.kind != FUNC_T) {
 			char err[384];
 			sprintf(err, "redeclaration of symbol %s", $$.sym->name);
 			yyerror(err);
 			YYABORT;
+		} else if (existing != NULL) {
+			// TODO: validate signature against existing entry
+			SymFree($$.sym);
+			$$.sym = existing;
+		} else {
+			SymInsert($$.sym);
 		}
 
-		SymInsert($$.sym);
 
 		// TODO: verify types before emitting assignment
 		if ($$.has_init == 1) {
@@ -267,13 +286,18 @@ direct_declarator:
 		$$.sym->name = $1;
 	}
 	| IDENTIFIER '(' parameter_list ')' {
+		if (current_table != &glb_table) {
+			yyerror("function declaration/definition outside of global scope");
+			YYABORT;
+		}
+
 		$$.sym = SymInit(FUNC_T);
 		$$.sym->type.func.arg_list = $3;
 		$$.sym->type.func.return_type = calloc(1, sizeof(*$$.sym->type.func.return_type));
+		*$$.sym->type.func.return_type = prim2type(INT_T);
 		$$.sym->name = $1;
 		$$.sym->inner_table = Create_SymbolTable($$.sym->name, FUNC, &glb_table);
-
-		SymbolTable *t = current_table;
+;
 		current_table = $$.sym->inner_table;
 
 		ArgList *it = $$.sym->type.func.arg_list;
@@ -290,12 +314,18 @@ direct_declarator:
 			it = it->next;
 		}
 
-		current_table = t;
+		current_table = &glb_table;
 	}
 	| IDENTIFIER '(' ')' {
+		if (current_table != &glb_table) {
+			yyerror("function declaration/definition outside of global scope");
+			YYABORT;
+		}
+
 		$$.sym = SymInit(FUNC_T);
 		$$.sym->type.func.arg_list = NULL;
 		$$.sym->type.func.return_type = calloc(1, sizeof(*$$.sym->type.func.return_type));
+		*$$.sym->type.func.return_type = prim2type(INT_T);
 		$$.sym->name = $1;
 		$$.sym->inner_table = Create_SymbolTable($$.sym->name, FUNC, &glb_table);
 	}
@@ -369,7 +399,41 @@ external_declaration:
 	| declaration {log("external-declaration")}
 	
 function_definition:
-	type_specifier declarator compound_statement {log("function-definition")}
+	type_specifier declarator {
+		if ($2.sym->type.kind != FUNC_T) {
+			yyerror("function definition must be a function");
+			YYABORT;
+		}
+
+		$2.sym->type.func.return_type->primitive = $1;
+		
+		current_table = $2.sym->inner_table;
+
+		Symbol *sym = SymInit($2.sym->type.func.return_type->kind);
+		sym->name = strdup("__retval");
+		sym->type = *$2.sym->type.func.return_type;
+		sym->size = GetSize(sym->type);
+
+		SymInsert(sym);
+
+		current_table = &glb_table;
+
+		Symbol *existing = SymLookup($2.sym->name);
+
+		if (existing != NULL) {
+			// TODO: validate signature against existing entry
+			SymFree($2.sym);
+			$2.sym = existing;
+		} else {
+			SymInsert($2.sym);
+		}
+
+		current_table = $2.sym->inner_table;
+
+		// TODO: annotate statements with next lists and fill them in properly, function code guard???
+	} compound_statement {
+		current_table = &glb_table;
+	}
 %%
 
 void yyerror(char *s) {

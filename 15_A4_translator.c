@@ -77,6 +77,7 @@ void Insert(QuadList *list, int ind) {
 }
 
 QuadList *Merge(QuadList *list1, QuadList *list2) {
+	// could be in place but im the RAM devil 😈
 	QuadList *new = MakeList(-1);
 
 	QuadList *it = list1;
@@ -323,12 +324,12 @@ void TypeFree(Type *type)
 }
 
 static const char *TypeSym[] = {
-	[PRIMITIVE_T] "PRIMITIVE_T",
-	[PRIMITIVE_PTR] "PRIMITIVE_PTR",
-	[ARRAY_PTR] "ARRAY_PTR",
-	[TEMP_T] "TEMP_T",
-	[ARRAY_T] "ARRAY_T",
-	[FUNC_T] "FUNC_T"
+	[PRIMITIVE_T] "PRIM",
+	[PRIMITIVE_PTR] "PRIM*",
+	[ARRAY_PTR] "ARR*",
+	[TEMP_T] "TEMP",
+	[ARRAY_T] "ARR",
+	[FUNC_T] "FUNC"
 };
 
 static const char *PrimitiveSym[] = {
@@ -360,6 +361,11 @@ void TypeDispl(Type t) {
 		break;
 
 		case FUNC_T:
+			if (arg == NULL) {
+				printf("NIL -> %s", PrimitiveSym[t.func.return_type->primitive]);
+				break;
+			}
+
 			while (arg != NULL) {
 				if (arg->elem.decl.type.kind == PRIMITIVE_PTR || arg->elem.decl.type.kind == ARRAY_PTR)
 					printf("*");
