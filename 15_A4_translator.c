@@ -129,6 +129,7 @@ static void DisplayAddr(Addr a) {
 	}
 }
 
+// TODO: too many assumptions about type of address, generalise to DisplayAddr
 void DisplayQuad(Quad q) {
 	switch (q.opcode) {
 		case ADD:
@@ -149,17 +150,17 @@ void DisplayQuad(Quad q) {
 			DisplayAddr(q.rs);
 		break;
 		case JMP:
-			printf("goto %s", q.rd.sym->name);
+			printf("goto %d", q.rd.imm);
 		break;
 		case JIF:
 			printf("if ");
 			DisplayAddr(q.rs);
-			printf(" goto %s", q.rd.sym->name);
+			printf(" goto %d", q.rd.imm);
 		break;
 		case JNT:
 			printf("ifFalse ");
 			DisplayAddr(q.rs);
-			printf(" goto %s", q.rd.sym->name);
+			printf(" goto %d", q.rd.imm);
 		break;
 		case JLT:
 		case JGT:
@@ -171,7 +172,7 @@ void DisplayQuad(Quad q) {
 			DisplayAddr(q.rs);
 			printf(" %s ", OpSym[q.opcode]);
 			DisplayAddr(q.rt);
-			printf(" goto %s", q.rd.sym->name);
+			printf(" goto %d", q.rd.imm);
 		break;
 		case PAR:
 			printf("param ");
@@ -186,6 +187,9 @@ void DisplayQuad(Quad q) {
 		break;
 		case RET:
 			printf("return");
+			if (q.rs.kind != IMMEDIATE) {
+				printf(" %s", q.rs.sym->name);
+			}
 		break;
 		case INDR:
 			printf("%s = %s[", q.rd.sym->name, q.rs.sym->name);
@@ -414,6 +418,15 @@ Symbol *SymLookup(const char *name) {
 			return sym;
 
 		sym = sym->next;
+	}
+
+	SymbolTable *tab = current_table;
+	if (current_table->parent != NULL) {
+		current_table = current_table->parent;
+		sym = SymLookup(name);
+		current_table = tab;
+	
+		return sym;
 	}
 
 	return NULL;

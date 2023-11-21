@@ -64,7 +64,7 @@ void Emit(Quad q);
 #define Param(source) ((Quad){PAR, source, AImm(0), AImm(0)})
 #define Call(func) ((Quad){CAL, AImm(0), AImm(0), func})
 #define CallAss(dest, func) ((Quad){CAL, dest, AImm(0), func})
-#define Return() ((Quad){RET, AImm(0), AImm(0), AImm(0)})
+#define Return(val) ((Quad){RET, val, AImm(0), AImm(0)})
 #define IndexRead(dest, source, index) ((Quad){INDR, source, index, dest})
 #define IndexWrite(dest, index, source) ((Quad){INDW, source, index, dest})
 #define DerefWrite(dest, source) ((Quad){PTRW, dest, AImm(0), source})

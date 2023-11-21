@@ -9,5 +9,5 @@ void garbo();
 int *make_fib_list(int a, char d, int *af) {
 	int car = "dream_machine" + a;
 	garbo();
-	int thing = 10;
+//	int thing = 10
 }

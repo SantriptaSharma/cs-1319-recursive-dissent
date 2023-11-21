@@ -21,18 +21,28 @@ TODO: write everything up in assignment pdf
 
 %union {
 	ExprAttrib expr;
+
 	struct _decl_attrib {
 		Symbol *sym;
 		ExprAttrib init;
 		char has_init;
 	} decl;
+
 	ArgList *argument_list;
 	ArgListElem arg;
-	QuadList *next_list;
-	char *string;
-	int val;
+
+	struct _opt_expr {
+		ExprAttrib expr;
+		char has_expr;
+	} opt_expr;
 
 	PRIMITIVE_TYPE type_spec;
+
+	QuadList *next_list;
+	size_t quad_index;
+	
+	char *string;
+	int val;
 }
 
 /* %token KEYWORD */
@@ -82,9 +92,26 @@ TODO: write everything up in assignment pdf
 %type <arg> parameter_declaration
 %type <expr> initializer
 
+%type <next_list> statement
+%type <next_list> compound_statement
+%type <next_list> block_item_list
+%type <next_list> block_item
+%type <opt_expr> opt_expression
+%type <next_list> expression_statement
+%type <next_list> selection_statement
+%type <next_list> iteration_statement
+%type <next_list> jump_statement
+
+%type <quad_index> marker
+%type <next_list> guard
+
 %start translation_unit
 
 %%
+/* auxiliary symbols */
+marker: { $$ = quads_size; }
+guard: { $$ = MakeList(quads_size); Emit(Jump(AImm(0))); }
+
 /* expressions */
 /* TODO: validate types and add implicit conversions 
 	Compatible Types: (int, char, temp, array, any_ptr)
@@ -350,44 +377,67 @@ parameter_declaration:
 	}
 
 initializer:
-	assignment_expression {log("initializer")}
+	assignment_expression
 
 /* Statements */
 statement:
-	compound_statement {log("statement")}
-	| expression_statement {log("statement")}
-	| selection_statement {log("statement")}
-	| iteration_statement {log("statement")}
-	| jump_statement {log("statement")}
+	compound_statement
+	| expression_statement
+	| selection_statement
+	| iteration_statement
+	| jump_statement
 
 compound_statement:
-	'{' '}' {log("compound-statement")}
-	| '{' block_item_list '}' {log("compound-statement")}
+	'{' '}' { $$ = NULL; }
+	| '{' block_item_list '}' { $$ = $2; }
 	
 block_item_list:
-	block_item {log("block-item-list")}
-	| block_item_list block_item {log("block-item-list")}
+	block_item
+	| block_item_list marker block_item { Backpatch($1, $2); $$ = $3; }
 
 block_item:
-	declaration {log("block-item")}
-	| statement {log("block-item")}
+	declaration { $$ = NULL; }
+	| statement
 
 opt_expression:
-	expression 
-	| /* empty */
+	expression { $$.expr = $1; $$.has_expr = 1; }
+	| /* empty */ { $$.has_expr = 0; }
 
 expression_statement:
-	opt_expression ';' {log("expression-statement")}
+	opt_expression ';' { $$ = NULL; }
 
 selection_statement:
-	IF '(' expression ')' statement {log("selection-statement")}
-	| IF '(' expression ')' statement ELSE statement {log("selection-statement")}
+	IF '(' expression ')' marker statement { Backpatch($3.truelist, $5); $$ = Merge($3.falselist, $6); }
+	| IF '(' expression ')' marker statement guard ELSE marker statement { 
+		Backpatch($3.truelist, $5); Backpatch($3.falselist, $9);
+		$$ = Merge($6, $7); $$ = Merge($$, $10);
+	}
 
 iteration_statement:
-	FOR '(' opt_expression ';' opt_expression ';' opt_expression ')' statement {log("iteration-statement")}
+	FOR '(' opt_expression ';' marker opt_expression ';' marker opt_expression guard ')' marker statement {
+		QuadList *tl = $6.has_expr ? $6.expr.truelist : NULL;
+		QuadList *fl = $6.has_expr ? $6.expr.falselist : NULL;
+
+		Backpatch(tl, $12); Backpatch($10, $5); Backpatch($13, $8);
+		Emit(Jump(AImm($5)));
+		$$ = fl;
+	}
 	
 jump_statement:
-	RETURN opt_expression ';' {log("jump-statement")}
+	RETURN opt_expression ';' { 
+		if (current_table->scope != FUNC) {
+			yyerror("return statement outside of function");
+			YYABORT;
+		} 
+		
+		$$ = NULL;
+
+		if ($2.has_expr == 1) {
+			Emit(Mov(((Addr){SYMBOL_A, .sym = SymLookup("__retval")}), ASym($2.expr)));
+		}
+
+		Emit(Return(AImm(0)));
+	}
 
 /* TLU */
 translation_unit:
@@ -433,6 +483,8 @@ function_definition:
 		// TODO: annotate statements with next lists and fill them in properly, function code guard???
 	} compound_statement {
 		current_table = &glb_table;
+
+		Emit(Return(AImm(0)));
 	}
 %%
 
