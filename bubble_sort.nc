@@ -1,7 +1,10 @@
 // Forward declarations
 void swap(int *p, int *q);
 void readArray(int size);
+void readInt(int *dest);
+void printStr(char *str);
 void printArray(int size);
+void printInt(int i);
 void bubbleSort(int n);
 int arr[20]; // Global array
 // Driver program to test above functions

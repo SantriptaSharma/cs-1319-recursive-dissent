@@ -115,6 +115,7 @@ guard: { $$ = MakeList(quads_size); Emit(Jump(AImm(0))); }
 /* expressions */
 /* TODO: validate types and add implicit conversions 
 	Compatible Types: (int, char, temp, array, any_ptr)
+	now, temps need types too for cross validation
 */
 constant:
 	INTCONST
@@ -122,12 +123,13 @@ constant:
 
 primary_expression:
 	IDENTIFIER {Symbol *sym = SymLookup($1); if (sym == NULL) {
-		char err[384];
-		sprintf(err, "Symbol not found: %s", $1);
+			char err[384];
+			sprintf(err, "Symbol not found: %s", $1);
+			yyerror(err);
+			YYABORT;
+		} else $$ = PURE_EXPR(sym);
 		free($1);
-		yyerror(err);
-		YYABORT;
-	} else $$ = PURE_EXPR(sym);}
+	}
 	| constant {$$ = PURE_EXPR(GenTemp()); Emit(Mov(ASym($$), AImm($1)));}
 	| STRING_LITERAL {$$ = PURE_EXPR(StringLookupOrInsert($1)); free($1);}
 	| '(' expression ')' {$$ = $2;}
@@ -135,22 +137,79 @@ primary_expression:
 postfix_expression:
 	primary_expression
 	| postfix_expression '[' expression ']' {
-		// TODO: add error detection, make sure $1 is a pointer
-		$$ = PURE_EXPR(GenTemp()); Emit(IndexRead(ASym($$), ASym($1), ASym($3)));
+		if ($1.sym->type.kind != ARRAY_PTR && $1.sym->type.kind != PRIMITIVE_PTR && $1.sym->type.kind != ARRAY_T) {
+			yyerror("can't index non-array type");
+			YYABORT;
+		}
+
+		enum KIND_T kind = $1.sym->type.kind == ARRAY_PTR ? PRIMITIVE_PTR : PRIMITIVE_T;
+		$$ = PURE_EXPR(SymInit(kind));
+		size_t len = strlen($1.sym->name) + 15;
+		char *name = malloc(len);
+		sprintf(name, "%s__[%d]", $1.sym->name, current_table->temp_count++);
+		$$.sym->name = name;
+		$$.sym->type = $1.sym->type.kind == PRIMITIVE_PTR ? prim2type($1.sym->type.primitive) : prim2type($1.sym->type.array.base);
+		$$.sym->size = GetSize($$.sym->type);
+
+		SymInsert($$.sym);
+
+		Emit(IndexRead(ASym($$), ASym($1), ASym($3)));
 	}
 	| postfix_expression '(' argument_expression_list ')' {
-		// TODO: call, validate number and type of params
-		log("postfix-expression")
+		// TODO: validate type of params
+		if ($1.sym->type.kind != FUNC_T) {
+			yyerror("can't call non-function type");
+			YYABORT;
+		}
+
+		if ($1.sym->type.func.arg_list == NULL) {
+			yyerror("function does not take any parameters");
+			YYABORT;
+		}
+
+		size_t argc = 0;
+
+		ArgList *it = $1.sym->type.func.arg_list;
+		ArgList *it2 = $3;
+
+		while (it != NULL && it2 != NULL) {
+			Emit(Param(ASym(it2->elem.expr)));
+
+			argc += 1;
+			it = it->next;
+			it2 = it2->next;
+		}
+
+		if (it != NULL || it2 != NULL) {
+			yyerror("function call has wrong number of parameters");
+			YYABORT;
+		}
+
 		DestroyArgList($3);
+		
+		$$ = PURE_EXPR(GenTemp());
+
+		Emit(CallAss(ASym($$), ASym($1), AImm(argc)));
 	}
 	| postfix_expression '(' ')' {
-		// TODO: call, validate number and type of params
-		log("postfix-expression")
+		if ($1.sym->type.kind != FUNC_T) {
+			yyerror("can't call non-function type");
+			YYABORT;
+		}
+
+		if ($1.sym->type.func.arg_list != NULL) {
+			yyerror("function does not take 0 parameters");
+			YYABORT;
+		}
+		
+		$$ = PURE_EXPR(GenTemp());
+
+		Emit(CallAss(ASym($$), ASym($1), AImm(0)));
 	}
-	| postfix_expression ARROW IDENTIFIER {
-		// TODO: not sure what to do here? we don't have structs
+	/* | postfix_expression ARROW IDENTIFIER {
+		// not sure what to do here? we don't have structs
 		log("postfix-expression")
-	}
+	} */
 
 argument_expression_list:
 	assignment_expression {$$ = MakeArgList(ARG_EXPR($1));}
@@ -161,10 +220,46 @@ argument_expression_list:
 unary_expression:
 	postfix_expression
 	| '&' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(ADDR, ASym($$), ASym($2)));}
-	| '*' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(DEREF, ASym($$), ASym($2)));}
+	| '*' unary_expression {
+		if ($2.sym->type.kind != ARRAY_PTR && $2.sym->type.kind != PRIMITIVE_PTR && $2.sym->type.kind != ARRAY_T) {
+			yyerror("can't dereference non-pointer type");
+			YYABORT;
+		}
+		
+		enum KIND_T kind = $2.sym->type.kind == ARRAY_PTR ? ARRAY_T : PRIMITIVE_T;
+		size_t len = strlen($2.sym->name) + 4;
+		char *name = malloc(len);
+		sprintf(name, "*__%s", $2.sym->name);
+
+		$$ = PURE_EXPR(SymInit(kind));
+
+		$$.sym = SymLookup(name);
+
+		if ($$.sym != NULL) {
+			free(name);
+		} else {
+			$$ = PURE_EXPR(SymInit(kind));
+			$$.sym->name = name;
+			$$.sym->type = $2.sym->type.kind != PRIMITIVE_T ? prim2type($2.sym->type.array.base) : prim2type($2.sym->type.primitive);
+			$$.sym->size = GetSize($$.sym->type);
+
+			SymInsert($$.sym);
+		}
+
+		Emit(UnaryOp(DEREF, ASym($$), ASym($2)));
+	}
 	| '+' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(POS, ASym($$), ASym($2)));}
 	| '-' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(NEG, ASym($$), ASym($2)));}
-	| '!' unary_expression {$$ = $2;}
+	| '!' unary_expression {
+		if ($2.truelist == NULL) {
+			$2.truelist = MakeList(quads_size);
+			Emit(JumpIf(AImm(0), ASym($2)));
+			$2.falselist = MakeList(quads_size);
+			Emit(Jump(AImm(0)));
+		}
+
+		$$ = BOOL_EXPR($2.sym, $2.falselist, $2.truelist);
+	}
 
 multiplicative_expression:
 	unary_expression
@@ -179,37 +274,140 @@ additive_expression:
 
 relational_expression:
 	additive_expression
-	| relational_expression '<' additive_expression {log("relational-expression")}
-	| relational_expression '>' additive_expression {log("relational-expression")}
-	| relational_expression LEQ additive_expression {log("relational-expression")}
-	| relational_expression GEQ additive_expression {log("relational-expression")}
+	| relational_expression '<' additive_expression {
+		QuadList *tl = MakeList(quads_size);
+		Emit(JumpIfLess(AImm(0), ASym($1), ASym($3)));
+		QuadList *fl = MakeList(quads_size);
+		Emit(Jump(AImm(0)));
+		$$ = BOOL_EXPR($1.sym, tl, fl);
+	}
+	| relational_expression '>' additive_expression {
+		QuadList *tl = MakeList(quads_size);
+		Emit(JumpIfGreater(AImm(0), ASym($1), ASym($3)));
+		QuadList *fl = MakeList(quads_size);
+		Emit(Jump(AImm(0)));
+
+		$$ = BOOL_EXPR($1.sym, tl, fl);
+	}
+	| relational_expression LEQ additive_expression {
+		QuadList *tl = MakeList(quads_size);
+		Emit(JumpIfLessEqual(AImm(0), ASym($1), ASym($3)));
+		QuadList *fl = MakeList(quads_size);
+		Emit(Jump(AImm(0)));
+
+		$$ = BOOL_EXPR($1.sym, tl, fl);
+	}
+	| relational_expression GEQ additive_expression {
+		QuadList *tl = MakeList(quads_size);
+		Emit(JumpIfGreaterEqual(AImm(0), ASym($1), ASym($3)));
+		QuadList *fl = MakeList(quads_size);
+		Emit(Jump(AImm(0)));
+
+		$$ = BOOL_EXPR($1.sym, tl, fl);
+	}
 
 equality_expression:
 	relational_expression
-	| equality_expression CEQ relational_expression {log("equality-expression")}
-	| equality_expression NEQ relational_expression {log("equality-expression")}
+	| equality_expression CEQ relational_expression {
+		QuadList *tl = MakeList(quads_size);
+		Emit(JumpIfEqual(AImm(0), ASym($1), ASym($3)));
+		QuadList *fl = MakeList(quads_size);
+		Emit(Jump(AImm(0)));
+
+		$$ = BOOL_EXPR($1.sym, tl, fl);
+	}
+	| equality_expression NEQ relational_expression {
+		QuadList *tl = MakeList(quads_size);
+		Emit(JumpIfNotEqual(AImm(0), ASym($1), ASym($3)));
+		QuadList *fl = MakeList(quads_size);
+		Emit(Jump(AImm(0)));
+
+		$$ = BOOL_EXPR($1.sym, tl, fl);
+	}
 
 logical_AND_expression:
 	equality_expression
-	| logical_AND_expression LAND equality_expression {log("logical-AND-expression")}
+	| logical_AND_expression {
+		if ($1.truelist == NULL) {
+			$1.truelist = MakeList(quads_size);
+			Emit(JumpIf(AImm(0), ASym($1)));
+			$1.falselist = MakeList(quads_size);
+			Emit(Jump(AImm(0)));
+		}
+	} LAND marker equality_expression {
+		if ($5.truelist == NULL) {
+			$5.truelist = MakeList(quads_size);
+			Emit(JumpIf(AImm(0), ASym($5)));
+			$5.falselist = MakeList(quads_size);
+			Emit(Jump(AImm(0)));
+		}
+
+		Backpatch($1.truelist, $4);
+
+		$$ = BOOL_EXPR($1.sym, $5.truelist, Merge($1.falselist, $5.falselist));
+	}
 
 logical_OR_expression:
 	logical_AND_expression
-	| logical_OR_expression LOR logical_AND_expression {log("logical-OR-expression")}
+	| logical_OR_expression {
+		if ($1.truelist == NULL) {
+			$1.truelist = MakeList(quads_size);
+			Emit(JumpIf(AImm(0), ASym($1)));
+			$1.falselist = MakeList(quads_size);
+			Emit(Jump(AImm(0)));
+		}
+	} LOR marker logical_AND_expression {
+		if ($5.truelist == NULL) {
+			$5.truelist = MakeList(quads_size);
+			Emit(JumpIf(AImm(0), ASym($5)));
+			$5.falselist = MakeList(quads_size);
+			Emit(Jump(AImm(0)));
+		}
+
+		Backpatch($1.falselist, $4);
+
+		$$ = BOOL_EXPR($1.sym, Merge($1.truelist, $5.truelist), $5.falselist);
+	}
 
 conditional_expression:
 	logical_OR_expression
-	| logical_OR_expression '?' expression ':' conditional_expression {log("conditional-expression")}
+	| logical_OR_expression {
+		if ($1.truelist == NULL) {
+			$1.truelist = MakeList(quads_size);
+			Emit(JumpIf(AImm(0), ASym($1)));
+			$1.falselist = MakeList(quads_size);
+			Emit(Jump(AImm(0)));
+		}
+	} '?' marker expression guard ':' marker conditional_expression guard {
+		Backpatch($1.truelist, $4); 
+		Backpatch($1.falselist, $8);
+
+		$$ = PURE_EXPR(GenTemp());
+		Backpatch($6, quads_size);
+		Emit(Mov(ASym($$), ASym($5)));
+		size_t q = quads_size;
+		Emit(Jump(AImm(0)));
+
+		Backpatch($10, quads_size);
+		Emit(Mov(ASym($$), ASym($9)));
+		quads[q].rd.imm = quads_size;
+	}
 
 assignment_expression:
 	conditional_expression
-	| unary_expression '=' assignment_expression {log("assignment-expression")}
+	| unary_expression '=' assignment_expression {
+		if ($1.sym->type.kind == FUNC_T || $1.sym->type.kind == TEMP_T) {
+			yyerror("functions & temps can't be assigned to");
+			YYABORT;
+		}
+
+		Emit(Mov(ASym($1), ASym($3)));
+	}
 
 expression:
 	assignment_expression
 
 /* Declarations */
-// TODO: test this, seems to be complete, build a debug printer for symbols
 declaration:
 	type_specifier init_declarator ';' {
 		$$ = $2;
@@ -242,6 +440,7 @@ declaration:
 		}
 
 		Symbol *existing = SymLookup($$.sym->name);
+		$$.sym->size = GetSize($$.sym->type);
 
 		if (existing != NULL && $$.sym->type.kind != FUNC_T) {
 			char err[384];
@@ -393,7 +592,7 @@ compound_statement:
 	
 block_item_list:
 	block_item
-	| block_item_list marker block_item { Backpatch($1, $2); $$ = $3; }
+	| block_item_list marker block_item { Backpatch($1, $2); $$ = $3; Backpatch($$, quads_size); }
 
 block_item:
 	declaration { $$ = NULL; }
@@ -407,10 +606,24 @@ expression_statement:
 	opt_expression ';' { $$ = NULL; }
 
 selection_statement:
-	IF '(' expression ')' marker statement { Backpatch($3.truelist, $5); $$ = Merge($3.falselist, $6); }
+	IF '(' expression ')' marker statement { 
+		if ($3.truelist != NULL) {
+			Backpatch($3.truelist, $5); $$ = Merge($3.falselist, $6); 
+		} else {
+			Emit(JumpIf(AImm($5), ASym($3)));
+			$$ = MakeList(quads_size);
+			Emit(Jump(AImm(0)));
+		}
+	}
 	| IF '(' expression ')' marker statement guard ELSE marker statement { 
-		Backpatch($3.truelist, $5); Backpatch($3.falselist, $9);
-		$$ = Merge($6, $7); $$ = Merge($$, $10);
+		if ($3.truelist != NULL) {
+			Backpatch($3.truelist, $5); Backpatch($3.falselist, $9);
+			$$ = Merge($6, $7); $$ = Merge($$, $10);
+		} else {
+			Emit(JumpIf(AImm($5), ASym($3)));
+			Emit(Jump(AImm($9)));
+			$$ = Merge($6, $10);
+		}
 	}
 
 iteration_statement:
@@ -419,7 +632,7 @@ iteration_statement:
 		QuadList *fl = $6.has_expr ? $6.expr.falselist : NULL;
 
 		Backpatch(tl, $12); Backpatch($10, $5); Backpatch($13, $8);
-		Emit(Jump(AImm($5)));
+		Emit(Jump(AImm($8)));
 		$$ = fl;
 	}
 	
@@ -480,10 +693,11 @@ function_definition:
 
 		current_table = $2.sym->inner_table;
 
-		// TODO: annotate statements with next lists and fill them in properly, function code guard???
+		Emit(FnLabel(ASym($2)));
 	} compound_statement {
 		current_table = &glb_table;
 
+		Backpatch($4, quads_size);
 		Emit(Return(AImm(0)));
 	}
 %%

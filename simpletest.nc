@@ -1,7 +1,7 @@
 int GLOB = 1;
 char POPPING_thing = 'c';
 
-void printf();
+void printf(char *c, int argv);
 
 int main(int argc, char *argv) {
 	int i = GLOB;

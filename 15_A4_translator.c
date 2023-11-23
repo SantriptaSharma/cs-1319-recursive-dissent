@@ -26,7 +26,7 @@ static void FreeQuads()
 }
 
 static const char *OpSym[] = {
-	[ADD] "+", [SUB] "-", [MUL] "*", [DIV] "/", [MOD] "%%",
+	[ADD] "+", [SUB] "-", [MUL] "*", [DIV] "/", [MOD] "%",
 	[POS] "+", [NEG] "-", [ADDR] "&", [DEREF] "*", [JLT] "<",
 	[JGT] ">", [JEQ] "==", [JNE] "!=", [JLE] "<=", [JGE] ">=",
 };
@@ -129,7 +129,6 @@ static void DisplayAddr(Addr a) {
 	}
 }
 
-// TODO: too many assumptions about type of address, generalise to DisplayAddr
 void DisplayQuad(Quad q) {
 	switch (q.opcode) {
 		case ADD:
@@ -180,9 +179,9 @@ void DisplayQuad(Quad q) {
 		break;
 		case CAL:
 			if (q.rs.kind == SYMBOL_A)
-				printf("%s = call %s, %d", q.rs.sym->name, q.rd.sym->name, 10000);
+				printf("%s = call %s, %d", q.rs.sym->name, q.rd.sym->name, q.rt.imm);
 			else if (q.rs.kind == IMMEDIATE) {
-				printf("call %s, %d", q.rd.sym->name, 10000);
+				printf("call %s, %d", q.rd.sym->name, q.rd.imm);
 			}
 		break;
 		case RET:
@@ -210,11 +209,15 @@ void DisplayQuad(Quad q) {
 			printf("%s = ", q.rd.sym->name);
 			DisplayAddr(q.rs);
 		break;
+		case FN_LABEL:
+			printf("%s:", q.rd.sym->name);
+		break;
 	}
 }
 
 void DisplayQuads() {
 	for (int i = 0; i < quads_size; i++) {
+		if (quads[i].opcode == FN_LABEL) printf("\n");
 		printf("%d: ", i);
 		DisplayQuad(quads[i]);
 		printf("\n");
@@ -323,6 +326,7 @@ void TypeFree(Type *type)
 {
 	if (type->kind == FUNC_T) {
 		TypeFree(type->func.return_type);
+		free(type->func.return_type);
 		DestroyArgList(type->func.arg_list);
 	}
 }
@@ -496,7 +500,7 @@ Symbol *StringLookupOrInsert(const char *str) {
 
 Symbol *GenTemp()
 {
-	char name[16];
+	char name[20];
 	sprintf(name, "__t_%d_", current_table->temp_count++);
 
 	Symbol *sym = SymLookupOrInsert(name);
@@ -574,8 +578,8 @@ int main() {
 
 	yyparse();
 	
-	DisplayQuads();
 	SymTableDispl(current_table);
+	DisplayQuads();
 
 	FreeTables();
 	FreeQuads();

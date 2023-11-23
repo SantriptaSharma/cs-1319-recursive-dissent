@@ -34,10 +34,9 @@ QuadList *Merge(QuadList *list1, QuadList *list2);
 void Backpatch(QuadList *list, int dest);
 void FreeList(QuadList *list);
 
-// TODO: remove not if assignment finally does not ask for it, a couple places to remove from
 typedef struct {
 	enum OPCODE {ADD, SUB, MUL, DIV, MOD, MOV, POS, NEG, ADDR, DEREF, JMP, JIF, JNT, 
-	JLT, JGT, JEQ, JNE, JLE, JGE, PAR, CAL, RET, INDR, INDW, PTRW} opcode;
+	JLT, JGT, JEQ, JNE, JLE, JGE, PAR, CAL, RET, INDR, INDW, PTRW, FN_LABEL} opcode;
 	Addr rs, rt, rd;
 } Quad;
 
@@ -62,12 +61,13 @@ void Emit(Quad q);
 #define JumpIfLessEqual(dest, op1, op2) ((Quad){JLE, op1, op2, dest})
 #define JumpIfGreaterEqual(dest, op1, op2) ((Quad){JGE, op1, op2, dest})
 #define Param(source) ((Quad){PAR, source, AImm(0), AImm(0)})
-#define Call(func) ((Quad){CAL, AImm(0), AImm(0), func})
-#define CallAss(dest, func) ((Quad){CAL, dest, AImm(0), func})
+#define Call(func, args) ((Quad){CAL, AImm(0), args, func})
+#define CallAss(dest, func, args) ((Quad){CAL, dest, args, func})
 #define Return(val) ((Quad){RET, val, AImm(0), AImm(0)})
 #define IndexRead(dest, source, index) ((Quad){INDR, source, index, dest})
 #define IndexWrite(dest, index, source) ((Quad){INDW, source, index, dest})
 #define DerefWrite(dest, source) ((Quad){PTRW, dest, AImm(0), source})
+#define FnLabel(label) ((Quad){FN_LABEL, AImm(0), AImm(0), label})
 
 void DisplayQuad(Quad q);
 void DisplayQuads();
@@ -137,6 +137,7 @@ typedef struct _ExprAttrib {
 } ExprAttrib;
 
 #define PURE_EXPR(x) ((ExprAttrib){.sym = x, .truelist = NULL, .falselist = NULL})
+#define BOOL_EXPR(x, tl, fl) ((ExprAttrib){.sym = x, .truelist = tl, .falselist = fl})
 
 typedef struct _ArgListElem {
 	enum {EXPR, DECL} kind;
