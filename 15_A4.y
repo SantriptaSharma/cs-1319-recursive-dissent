@@ -620,7 +620,7 @@ selection_statement:
 			Emit(Jump(AImm(0)));
 		}
 	}
-	| IF '(' expression ')' marker statement <next_list>{ $$ = MakeList(quads_size); Emit(Jump(AImm(0))); } ELSE marker statement { 
+	| IF '(' expression ')' marker statement guard ELSE marker statement { 
 		if ($3.truelist != NULL) {
 			Backpatch($3.truelist, $5); Backpatch($3.falselist, $9);
 			$$ = Merge($6, $7); $$ = Merge($$, $10);
