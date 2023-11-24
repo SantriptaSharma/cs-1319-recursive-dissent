@@ -94,7 +94,7 @@ struct _ArgList;
 
 typedef struct _Type {
 	// needs some kind of types table + hashing mechanism to reuse types, instead of always creating new ones (wont implement for now)
-	enum KIND_T {PRIMITIVE_PTR, ARRAY_PTR, TEMP_T, PRIMITIVE_T, ARRAY_T, FUNC_T} kind;
+	enum KIND_T {PRIMITIVE_PTR, ARRAY_PTR, PRIMITIVE_T, ARRAY_T, FUNC_T} kind;
 	union {
 		PRIMITIVE_TYPE primitive;
 		struct {
@@ -109,6 +109,8 @@ typedef struct _Type {
 } Type;
 
 int GetSize(Type type);
+char TypeEq(Type t1, Type t2);
+char TypeCompatible(Type t1, Type t2);
 void TypeFree(Type *type);
 void TypeDispl(Type type);
 
@@ -118,11 +120,14 @@ typedef struct _Symbol {
 	int initial_value;
 	int size;
 	int offset;
+	char is_temp;
 	SymbolTable *inner_table;
 	struct _Symbol *next;
 } Symbol;
 
 Symbol *SymInit(enum KIND_T kind);
+Symbol *SymClone(Symbol *sym);
+Symbol *Cast(Symbol *sym, Type type);
 Symbol *SymLookup(const char *name);
 Symbol *SymLookupOrInsert(const char *name);
 Symbol *StringLookupOrInsert(const char *str);

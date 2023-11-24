@@ -299,7 +299,6 @@ int GetSize(Type type) {
 	switch (type.kind)
 	{
 		case PRIMITIVE_T:
-		case TEMP_T:
 			return Sizes[type.primitive];
 		break;
 
@@ -319,7 +318,72 @@ int GetSize(Type type) {
 		default:
 			return size_of_pointer;
 		break;
-	}	
+	}
+}
+
+char TypeEq(Type t1, Type t2) {
+	switch (t1.kind) {
+		Type base1, base2;
+
+		case PRIMITIVE_T:
+			return t1.primitive == t2.primitive;
+		break;
+
+		case PRIMITIVE_PTR:
+		case ARRAY_PTR:
+		case ARRAY_T:
+			base1 = t1.kind == PRIMITIVE_PTR ? prim2type(t1.primitive) : prim2type(t1.array.base);
+			base2 = t2.kind == PRIMITIVE_PTR ? prim2type(t2.primitive) : prim2type(t2.array.base);
+
+			if (t2.kind == PRIMITIVE_PTR || t2.kind == ARRAY_PTR || t2.kind == ARRAY_T)
+				return TypeEq(base1, base2);
+			else
+				return 0;
+		break;
+
+		case FUNC_T:
+			if (t2.kind != FUNC_T) return 0;
+
+			if (t1.func.return_type->primitive != t2.func.return_type->primitive) return 0;
+
+			ArgList *arg1 = t1.func.arg_list;
+			ArgList *arg2 = t2.func.arg_list;
+
+			while (arg1 != NULL && arg2 != NULL) {
+				if (!TypeEq(arg1->elem.decl.type, arg2->elem.decl.type)) return 0;
+
+				arg1 = arg1->next;
+				arg2 = arg2->next;
+			}
+
+			return arg1 == NULL && arg2 == NULL;
+
+		default:
+			return 0;
+		break;
+	}
+}
+
+// will implicitly allow conversions char <-> int, int <-> pointer, but not char <-> pointer (technically int <-> char just as invalid, but let's allow it)
+char TypeCompatible(Type t1, Type t2) {
+	switch (t1.kind) {
+		PRIMITIVE_TYPE t;
+		
+		case PRIMITIVE_T:
+			return t2.kind == !FUNC_T;
+		break;
+
+		case PRIMITIVE_PTR:
+		case ARRAY_PTR:
+		case ARRAY_T:
+			t = t1.kind == PRIMITIVE_PTR ? t1.primitive : t1.array.base;
+			return t2.kind != FUNC_T && t != CHAR_T;
+		break;
+
+		default:
+			return 0;
+		break;
+	}
 }
 
 void TypeFree(Type *type)
@@ -335,7 +399,6 @@ static const char *TypeSym[] = {
 	[PRIMITIVE_T] "PRIM",
 	[PRIMITIVE_PTR] "PRIM*",
 	[ARRAY_PTR] "ARR*",
-	[TEMP_T] "TEMP",
 	[ARRAY_T] "ARR",
 	[FUNC_T] "FUNC"
 };
@@ -352,7 +415,6 @@ void TypeDispl(Type t) {
 
 	switch (t.kind) {
 		case PRIMITIVE_T:
-		case TEMP_T:
 			printf("%s", PrimitiveSym[t.primitive]);
 		break;
 
@@ -398,7 +460,6 @@ Symbol *SymInit(enum KIND_T kind) {
 		case PRIMITIVE_T:
 		case PRIMITIVE_PTR:
 		case ARRAY_PTR:
-		case TEMP_T:
 			sym->size = GetSize(sym->type);
 		break;
 
@@ -412,7 +473,59 @@ Symbol *SymInit(enum KIND_T kind) {
 		break;
 	}
 
+	sym->is_temp = 0;
+
 	return sym;
+}
+
+// clone any non-func symbol, doesn't assign a name
+Symbol *SymClone(Symbol *sym) {
+	if (sym->type.kind == FUNC_T) return NULL;
+
+	Symbol *clone = malloc(sizeof(*clone));
+	clone->type = sym->type;
+	clone->initial_value = sym->initial_value;
+	clone->size = sym->size;
+	clone->offset = sym->offset;
+	clone->is_temp = sym->is_temp;
+	clone->inner_table = sym->inner_table;
+	clone->next = NULL;
+
+	SymInsert(clone);
+
+	return clone;
+}
+
+// cast any non-func symbol to a given type, creating and returning a new symbol
+Symbol *Cast(Symbol *sym, Type type) {
+	if (type.kind == FUNC_T) return NULL;
+	if (TypeEq(sym->type, type)) return sym;
+
+	Symbol *new = SymClone(sym);
+	size_t len = strlen(sym->name) + 16;
+	new->name = malloc(len);
+	sprintf((char *) new->name, "__cast[%d]_%s", current_table->temp_count++, sym->name);
+	new->type = type;
+	new->size = GetSize(type);
+	new->is_temp = 1;
+
+	SymInsert(new);
+
+	Quad q = (Quad) {
+		.opcode = MOV,
+		.rd = (Addr) {
+			.kind = SYMBOL_A,
+			.sym = new
+		},
+		.rs = (Addr) {
+			.kind = SYMBOL_A,
+			.sym = sym
+		}
+	};
+
+	Emit(q);
+
+	return new;
 }
 
 Symbol *SymLookup(const char *name) {
@@ -504,7 +617,8 @@ Symbol *GenTemp()
 	sprintf(name, "__t_%d_", current_table->temp_count++);
 
 	Symbol *sym = SymLookupOrInsert(name);
-	sym->type.kind = TEMP_T;
+	sym->type.kind = PRIMITIVE_T;
+	sym->is_temp = 1;
 	sym->type.primitive = INT_T;
 
 	sym->size = GetSize(sym->type);

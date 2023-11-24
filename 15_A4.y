@@ -396,7 +396,7 @@ conditional_expression:
 assignment_expression:
 	conditional_expression
 	| unary_expression '=' assignment_expression {
-		if ($1.sym->type.kind == FUNC_T || $1.sym->type.kind == TEMP_T) {
+		if ($1.sym->type.kind == FUNC_T || $1.sym->is_temp) {
 			yyerror("functions & temps can't be assigned to");
 			YYABORT;
 		}
@@ -437,6 +437,11 @@ declaration:
 
 				current_table = &glb_table;
 			break;
+		}
+
+		if ($1 == VOID_T && $$.sym->type.kind != FUNC_T) {
+			yyerror("void is zero-sized!");
+			YYABORT;
 		}
 
 		Symbol *existing = SymLookup($$.sym->name);
@@ -615,7 +620,7 @@ selection_statement:
 			Emit(Jump(AImm(0)));
 		}
 	}
-	| IF '(' expression ')' marker statement guard ELSE marker statement { 
+	| IF '(' expression ')' marker statement <next_list>{ $$ = MakeList(quads_size); Emit(Jump(AImm(0))); } ELSE marker statement { 
 		if ($3.truelist != NULL) {
 			Backpatch($3.truelist, $5); Backpatch($3.falselist, $9);
 			$$ = Merge($6, $7); $$ = Merge($$, $10);
