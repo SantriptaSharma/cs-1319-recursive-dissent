@@ -124,7 +124,7 @@ constant:
 	| CHARCONST
 
 primary_expression:
-	IDENTIFIER {Symbol *sym = SymLookup($1); if (sym == NULL) {
+	IDENTIFIER {Symbol *sym = SymLookup($1, 1); if (sym == NULL) {
 			char err[384];
 			sprintf(err, "Symbol not found: %s", $1);
 			yyerror(err);
@@ -242,7 +242,7 @@ unary_expression:
 
 		$$ = PURE_EXPR(SymInit(kind));
 
-		$$.sym = SymLookup(name);
+		$$.sym = SymLookup(name, 1);
 
 		if ($$.sym != NULL) {
 			free(name);
@@ -258,7 +258,8 @@ unary_expression:
 		Emit(UnaryOp(DEREF, ASym($$), ASym($2)));
 	}
 	| '+' unary_expression {
-		$$ = PURE_EXPR(GenTemp()); 
+		$$ = PURE_EXPR(GenTemp());
+
 		if ($2.sym->initial_value != 0) {
 			$$.sym->initial_value = $2.sym->initial_value;
 		} else {
@@ -288,7 +289,17 @@ unary_expression:
 multiplicative_expression:
 	unary_expression
 	| multiplicative_expression '*' unary_expression {
-		$$ = PURE_EXPR(GenTemp()); 
+		$$ = PURE_EXPR(GenTemp());
+
+		// if (!TypeEqual($1.sym->type, $3.sym->type)) {
+			
+		// 	if (TypeCompatible($1.sym->type, $3.sym->type)) {
+		// 		$3.sym = Cast($3.sym, $1.sym->type);
+		// 	}
+		
+		// 	yyerror("can't multiply different types");
+		// 	YYABORT;
+		// }
 
 		if ($1.sym->initial_value != 0 && $3.sym->initial_value != 0) {
 			$$.sym->initial_value = $1.sym->initial_value * $3.sym->initial_value;
@@ -466,6 +477,7 @@ assignment_expression:
 		}
 
 		Emit(Mov(ASym($1), ASym($3)));
+		$$ = $1;
 	}
 
 expression:
@@ -508,7 +520,7 @@ declaration:
 			YYABORT;
 		}
 
-		Symbol *existing = SymLookup($$.sym->name);
+		Symbol *existing = SymLookup($$.sym->name, 1);
 		$$.sym->size = GetSize($$.sym->type);
 
 		if (existing != NULL && $$.sym->type.kind != FUNC_T) {
@@ -715,7 +727,7 @@ jump_statement:
 		$$ = NULL;
 
 		if ($2.has_expr == 1) {
-			Emit(Mov(((Addr){SYMBOL_A, .sym = SymLookup("__retval")}), ASym($2.expr)));
+			Emit(Mov(((Addr){SYMBOL_A, .sym = SymLookup("__retval", 0)}), ASym($2.expr)));
 		}
 
 		Emit(Return(AImm(0)));
@@ -750,7 +762,7 @@ function_definition:
 
 		current_table = &glb_table;
 
-		Symbol *existing = SymLookup($2.sym->name);
+		Symbol *existing = SymLookup($2.sym->name, 0);
 
 		if (existing != NULL) {
 			// TODO: validate signature against existing entry
@@ -766,8 +778,12 @@ function_definition:
 	} compound_statement {
 		current_table = &glb_table;
 
-		Backpatch($4, quads_size);
-		Emit(Return(AImm(0)));
+		if (quads[quads_size - 1].opcode != RET) {
+			Backpatch($4, quads_size);
+			Emit(Return(AImm(0)));
+		} else {
+			Backpatch($4, quads_size - 1);
+		}
 	}
 %%
 

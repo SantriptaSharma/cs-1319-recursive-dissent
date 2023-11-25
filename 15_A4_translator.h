@@ -128,8 +128,7 @@ typedef struct _Symbol {
 Symbol *SymInit(enum KIND_T kind);
 Symbol *SymClone(Symbol *sym);
 Symbol *Cast(Symbol *sym, Type type);
-Symbol *SymLookup(const char *name);
-Symbol *SymLookupOrInsert(const char *name);
+Symbol *SymLookup(const char *name, char traverse_up);
 Symbol *StringLookupOrInsert(const char *str);
 Symbol *GenTemp();
 void SymInsert(Symbol *sym);

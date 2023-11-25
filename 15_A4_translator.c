@@ -125,7 +125,7 @@ void Emit(Quad q) {
 static void DisplayAddr(Addr a) {
 	switch (a.kind) {
 		case IMMEDIATE: printf("%d", a.imm); break;
-		case SYMBOL_A: printf("%s", a.sym->name); break;
+		case SYMBOL_A: printf("%s", a.sym->name); if(a.sym->initial_value != 0) printf("(%d)", a.sym->initial_value); break;
 	}
 }
 
@@ -136,7 +136,8 @@ void DisplayQuad(Quad q) {
 		case MUL:
 		case DIV:
 		case MOD:
-			printf("%s = ", q.rd.sym->name);
+			DisplayAddr(q.rd);
+			printf(" = ", q.rd.sym->name);
 			DisplayAddr(q.rs);
 			printf(" %s ", OpSym[q.opcode]);
 			DisplayAddr(q.rt);
@@ -145,21 +146,25 @@ void DisplayQuad(Quad q) {
 		case NEG:
 		case ADDR:
 		case DEREF:
-			printf("%s = %s", q.rd.sym->name, OpSym[q.opcode]);
+			DisplayAddr(q.rd);
+			printf(" = %s", q.rd.sym->name, OpSym[q.opcode]);
 			DisplayAddr(q.rs);
 		break;
 		case JMP:
-			printf("goto %d", q.rd.imm);
+			printf("goto ");
+			DisplayAddr(q.rd);
 		break;
 		case JIF:
 			printf("if ");
 			DisplayAddr(q.rs);
-			printf(" goto %d", q.rd.imm);
+			printf(" goto ");
+			DisplayAddr(q.rd);
 		break;
 		case JNT:
 			printf("ifFalse ");
 			DisplayAddr(q.rs);
-			printf(" goto %d", q.rd.imm);
+			printf(" goto ");
+			DisplayAddr(q.rd);
 		break;
 		case JLT:
 		case JGT:
@@ -171,42 +176,58 @@ void DisplayQuad(Quad q) {
 			DisplayAddr(q.rs);
 			printf(" %s ", OpSym[q.opcode]);
 			DisplayAddr(q.rt);
-			printf(" goto %d", q.rd.imm);
+			printf(" goto ");
+			DisplayAddr(q.rd);
 		break;
 		case PAR:
 			printf("param ");
 			DisplayAddr(q.rs);
 		break;
 		case CAL:
-			if (q.rs.kind == SYMBOL_A)
-				printf("%s = call %s, %d", q.rs.sym->name, q.rd.sym->name, q.rt.imm);
-			else if (q.rs.kind == IMMEDIATE) {
-				printf("call %s, %d", q.rd.sym->name, q.rd.imm);
+			if (q.rs.kind == SYMBOL_A) {
+				DisplayAddr(q.rs);
+				printf(" = call ");
+				DisplayAddr(q.rd);
+				printf(", ");
+				DisplayAddr(q.rt);
+			} else if (q.rs.kind == IMMEDIATE) {
+				printf("call ");
+				DisplayAddr(q.rd);
+				printf(", ");
+				DisplayAddr(q.rt);
 			}
 		break;
 		case RET:
 			printf("return");
 			if (q.rs.kind != IMMEDIATE) {
-				printf(" %s", q.rs.sym->name);
+				printf(" ");
+				DisplayAddr(q.rs);
 			}
 		break;
 		case INDR:
-			printf("%s = %s[", q.rd.sym->name, q.rs.sym->name);
+			DisplayAddr(q.rd);
+			printf(" = ");
+			DisplayAddr(q.rs);
+			printf("[");
 			DisplayAddr(q.rt);
 			printf("]");
 		break;
 		case INDW:
-			printf("%s[", q.rd.sym->name);
+			DisplayAddr(q.rd);
+			printf("[");
 			DisplayAddr(q.rs);
 			printf("] = ");
 			DisplayAddr(q.rt);
 		break;
 		case PTRW:
-			printf("*%s = ", q.rd.sym->name);
+			printf("*");
+			DisplayAddr(q.rd);
+			printf(" = ");
 			DisplayAddr(q.rs);
 		break;
 		case MOV:
-			printf("%s = ", q.rd.sym->name);
+			DisplayAddr(q.rd);
+			printf(" = ");
 			DisplayAddr(q.rs);
 		break;
 		case FN_LABEL:
@@ -528,7 +549,7 @@ Symbol *Cast(Symbol *sym, Type type) {
 	return new;
 }
 
-Symbol *SymLookup(const char *name) {
+Symbol *SymLookup(const char *name, char traverse_up) {
 	Symbol *sym = current_table->sym_head;
 	while (sym) {
 		if (!strcmp(sym->name, name))
@@ -537,39 +558,18 @@ Symbol *SymLookup(const char *name) {
 		sym = sym->next;
 	}
 
+	if (!traverse_up) return NULL;
+
 	SymbolTable *tab = current_table;
 	if (current_table->parent != NULL) {
 		current_table = current_table->parent;
-		sym = SymLookup(name);
+		sym = SymLookup(name, 1);
 		current_table = tab;
 	
 		return sym;
 	}
 
 	return NULL;
-}
-
-Symbol *SymLookupOrInsert(const char *name) {
-	Symbol *sym = SymLookup(name);
-
-	if (sym == NULL) {
-		sym = malloc(sizeof(*sym));
-		
-		sym->name = strdup(name);
-		sym->type = (Type) {
-			.kind = PRIMITIVE_T,
-			.primitive = INT_T
-		};
-		sym->initial_value = 0;
-		sym->size = size_of_int;
-		sym->offset = 0;
-		sym->inner_table = NULL;
-		sym->next = NULL;
-
-		SymInsert(sym);
-	}
-
-	return sym;
 }
 
 Symbol *StringLookupOrInsert(const char *str) {
@@ -581,7 +581,7 @@ Symbol *StringLookupOrInsert(const char *str) {
 	SymbolTable *c = current_table;
 	current_table = &glb_table;
 
-	Symbol *sym = SymLookup(name);
+	Symbol *sym = SymLookup(name, 0);
 
 	char new = sym == NULL;
 
@@ -616,7 +616,25 @@ Symbol *GenTemp()
 	char name[20];
 	sprintf(name, "__t_%d_", current_table->temp_count++);
 
-	Symbol *sym = SymLookupOrInsert(name);
+	Symbol *sym = SymLookup(name, 0);
+
+	if (sym == NULL) {
+		sym = malloc(sizeof(*sym));
+		
+		sym->name = strdup(name);
+		sym->type = (Type) {
+			.kind = PRIMITIVE_T,
+			.primitive = INT_T
+		};
+		sym->initial_value = 0;
+		sym->size = size_of_int;
+		sym->offset = 0;
+		sym->inner_table = NULL;
+		sym->next = NULL;
+
+		SymInsert(sym);
+	}
+
 	sym->type.kind = PRIMITIVE_T;
 	sym->is_temp = 1;
 	sym->type.primitive = INT_T;
