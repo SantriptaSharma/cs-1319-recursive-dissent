@@ -147,7 +147,7 @@ void DisplayQuad(Quad q) {
 		case ADDR:
 		case DEREF:
 			DisplayAddr(q.rd);
-			printf(" = %s", q.rd.sym->name, OpSym[q.opcode]);
+			printf(" = %s", OpSym[q.opcode]);
 			DisplayAddr(q.rs);
 		break;
 		case JMP:
@@ -705,8 +705,6 @@ int main() {
 	InitLists();
 	InitQuads();
 	InitTables();
-
-	SymTableDispl(current_table);
 
 	yyparse();
 	

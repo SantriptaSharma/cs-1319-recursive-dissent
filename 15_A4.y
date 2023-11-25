@@ -13,12 +13,6 @@
 	void yyerror(char *s);
 %}
 
-/* 
-TODO: go through all rules, make sure no rules just logging remain 
-TODO: write everything up in assignment pdf   
-*/
-
-
 %union {
 	// Attribute for all expressions, contains pointers to a symbol, and optional pointers to true/false lists (non-null for bool exprs)
 	ExprAttrib expr;
@@ -35,17 +29,22 @@ TODO: write everything up in assignment pdf
 	// A single argument, either a declaration (for params) or an expression (for call args)
 	ArgListElem arg;
 
-
+	// Attribute for an optional_expression, contains the expression attribute and a flag indicating whether it's present
 	struct _opt_expr {
 		ExprAttrib expr;
 		char has_expr;
 	} opt_expr;
 
+	// Attribute for type specifier (int, char, void) tokens, just an enum mapping to INT_T, CHAR_T, VOID_T
 	PRIMITIVE_TYPE type_spec;
 
+	// Attribute for statements & guards, contains a pointer to their dangling exit quad addresses
 	QuadList *next_list;
+
+	// Attribute for a marker, contains the number of quads emitted at the time of the marker's reduction
 	size_t quad_index;
 	
+	// Attribute for constants
 	char *string;
 	int val;
 }
@@ -114,11 +113,11 @@ TODO: write everything up in assignment pdf
 
 %%
 /* auxiliary symbols */
-marker: { $$ = quads_size; }
-guard: { $$ = MakeList(quads_size); Emit(Jump(AImm(0))); }
+marker: { $$ = quads_size; } // just store the quad index of the next instruction on reduction
+guard: { $$ = MakeList(quads_size); Emit(Jump(AImm(0))); } // emit an unconditional jump, and store a next list to be filled in by rules that use guards
 
 /* expressions */
-/* TODO: validate types and add implicit conversions, on every operation and assignment */
+/* TODO: validate types and add implicit conversions, on every operation and assignment (wont do) */
 constant:
 	INTCONST
 	| CHARCONST
@@ -158,7 +157,7 @@ postfix_expression:
 		Emit(IndexRead(ASym($$), ASym($1), ASym($3)));
 	}
 	| postfix_expression '(' argument_expression_list ')' {
-		// TODO: validate type of params
+		// TODO: validate type of params (wont do)
 		if ($1.sym->type.kind != FUNC_T) {
 			yyerror("can't call non-function type");
 			YYABORT;
@@ -217,17 +216,26 @@ argument_expression_list:
 	assignment_expression {$$ = MakeArgList(ARG_EXPR($1));}
 	| argument_expression_list ',' assignment_expression {InsertArg($1, ARG_EXPR($3)); $$ = $1;}
 
-// TODO: write out relational actions using dummy keys
-
 unary_expression:
 	postfix_expression
 	| '&' unary_expression {
-		if ($2.sym->type.kind == FUNC_T) {
-			yyerror("can't take address of function, no fn pointers");
+		if ($2.sym->type.kind == FUNC_T || $2.sym->type.kind == ARRAY_PTR || $2.sym->type.kind == PRIMITIVE_PTR) {
+			yyerror("can't take address of func or a pointer, no multidim pointers");
 			YYABORT;
 		}
 
-		$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(ADDR, ASym($$), ASym($2)));
+		$$ = PURE_EXPR(GenTemp()); 
+		$$.sym->type.kind = $2.sym->type.kind == ARRAY_T ? ARRAY_PTR : PRIMITIVE_PTR;
+
+		if ($2.sym->type.kind == ARRAY_T) {
+			$$.sym->type.array.base = $2.sym->type.array.base;
+		} else {
+			$$.sym->type.primitive = $2.sym->type.primitive;
+		}
+
+		$$.sym->size = GetSize($$.sym->type);
+
+		Emit(UnaryOp(ADDR, ASym($$), ASym($2)));
 	}
 	| '*' unary_expression {
 		if ($2.sym->type.kind != ARRAY_PTR && $2.sym->type.kind != PRIMITIVE_PTR && $2.sym->type.kind != ARRAY_T) {
@@ -520,7 +528,7 @@ declaration:
 			YYABORT;
 		}
 
-		Symbol *existing = SymLookup($$.sym->name, 1);
+		Symbol *existing = SymLookup($$.sym->name, 0);
 		$$.sym->size = GetSize($$.sym->type);
 
 		if (existing != NULL && $$.sym->type.kind != FUNC_T) {
@@ -529,7 +537,7 @@ declaration:
 			yyerror(err);
 			YYABORT;
 		} else if (existing != NULL) {
-			// TODO: validate signature against existing entry
+			// TODO: validate signature against existing entry (wont do)
 			SymFree($$.sym);
 			$$.sym = existing;
 		} else {
@@ -537,7 +545,7 @@ declaration:
 		}
 
 
-		// TODO: verify types before emitting assignment
+		// TODO: verify types before emitting assignment (wont do)
 		if ($$.has_init == 1) {
 			Emit(Mov(ASym($$), ASym($$.init)));
 		}
@@ -735,12 +743,12 @@ jump_statement:
 
 /* TLU */
 translation_unit:
-	external_declaration {log("translation-unit")}
-	| translation_unit external_declaration {log("translation-unit")}
+	external_declaration
+	| translation_unit external_declaration
 
 external_declaration:
-	function_definition {log("external-declaration")}
-	| declaration {log("external-declaration")}
+	function_definition
+	| declaration
 	
 function_definition:
 	type_specifier declarator {
@@ -765,7 +773,7 @@ function_definition:
 		Symbol *existing = SymLookup($2.sym->name, 0);
 
 		if (existing != NULL) {
-			// TODO: validate signature against existing entry
+			// TODO: validate signature against existing entry (wont do)
 			SymFree($2.sym);
 			$2.sym = existing;
 		} else {
