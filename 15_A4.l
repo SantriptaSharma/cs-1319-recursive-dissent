@@ -45,7 +45,7 @@ COMMENTMULTI \/\*([^\*]|\*[^\/])*\*\/
 	yylval.string = val; return STRING_LITERAL;
 }  
 
-"->" { return ARROW; }
+	/* "->" { return ARROW; } */
 ">=" { return GEQ; }
 "<=" { return LEQ; }
 "==" { return CEQ; }

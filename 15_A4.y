@@ -20,16 +20,21 @@ TODO: write everything up in assignment pdf
 
 
 %union {
+	// Attribute for all expressions, contains pointers to a symbol, and optional pointers to true/false lists (non-null for bool exprs)
 	ExprAttrib expr;
 
+	// Attribute for all declarations, contains a pointer to a symbol (which we fill in slowly), and optionally an initialiser
 	struct _decl_attrib {
 		Symbol *sym;
 		ExprAttrib init;
 		char has_init;
 	} decl;
 
+	// Attribute for list of arguments, used for both parameter declarations and calls
 	ArgList *argument_list;
+	// A single argument, either a declaration (for params) or an expression (for call args)
 	ArgListElem arg;
+
 
 	struct _opt_expr {
 		ExprAttrib expr;
@@ -53,7 +58,7 @@ TODO: write everything up in assignment pdf
 %token <string> STRING_LITERAL
 
 /* %token PUNCTUATOR */
-%token ARROW
+/* %token ARROW */
 %token GEQ
 %token LEQ
 %token CEQ
@@ -113,10 +118,7 @@ marker: { $$ = quads_size; }
 guard: { $$ = MakeList(quads_size); Emit(Jump(AImm(0))); }
 
 /* expressions */
-/* TODO: validate types and add implicit conversions 
-	Compatible Types: (int, char, temp, array, any_ptr)
-	now, temps need types too for cross validation
-*/
+/* TODO: validate types and add implicit conversions, on every operation and assignment */
 constant:
 	INTCONST
 	| CHARCONST
@@ -130,7 +132,7 @@ primary_expression:
 		} else $$ = PURE_EXPR(sym);
 		free($1);
 	}
-	| constant {$$ = PURE_EXPR(GenTemp()); Emit(Mov(ASym($$), AImm($1)));}
+	| constant {$$ = PURE_EXPR(GenTemp()); $$.sym->initial_value = $1;}
 	| STRING_LITERAL {$$ = PURE_EXPR(StringLookupOrInsert($1)); free($1);}
 	| '(' expression ')' {$$ = $2;}
 
@@ -219,7 +221,14 @@ argument_expression_list:
 
 unary_expression:
 	postfix_expression
-	| '&' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(ADDR, ASym($$), ASym($2)));}
+	| '&' unary_expression {
+		if ($2.sym->type.kind == FUNC_T) {
+			yyerror("can't take address of function, no fn pointers");
+			YYABORT;
+		}
+
+		$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(ADDR, ASym($$), ASym($2)));
+	}
 	| '*' unary_expression {
 		if ($2.sym->type.kind != ARRAY_PTR && $2.sym->type.kind != PRIMITIVE_PTR && $2.sym->type.kind != ARRAY_T) {
 			yyerror("can't dereference non-pointer type");
@@ -248,8 +257,23 @@ unary_expression:
 
 		Emit(UnaryOp(DEREF, ASym($$), ASym($2)));
 	}
-	| '+' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(POS, ASym($$), ASym($2)));}
-	| '-' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(UnaryOp(NEG, ASym($$), ASym($2)));}
+	| '+' unary_expression {
+		$$ = PURE_EXPR(GenTemp()); 
+		if ($2.sym->initial_value != 0) {
+			$$.sym->initial_value = $2.sym->initial_value;
+		} else {
+			Emit(UnaryOp(POS, ASym($$), ASym($2)));
+		}
+	}
+	| '-' unary_expression {
+		$$ = PURE_EXPR(GenTemp()); 
+		
+		if ($2.sym->initial_value != 0) {
+			$$.sym->initial_value = -$2.sym->initial_value;
+		} else {
+			Emit(UnaryOp(NEG, ASym($$), ASym($2)));
+		}
+	}
 	| '!' unary_expression {
 		if ($2.truelist == NULL) {
 			$2.truelist = MakeList(quads_size);
@@ -263,14 +287,54 @@ unary_expression:
 
 multiplicative_expression:
 	unary_expression
-	| multiplicative_expression '*' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(MUL, ASym($$), ASym($1), ASym($3)));}
-	| multiplicative_expression '/' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(DIV, ASym($$), ASym($1), ASym($3)));}
-	| multiplicative_expression '%' unary_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(MOD, ASym($$), ASym($1), ASym($3)));}
+	| multiplicative_expression '*' unary_expression {
+		$$ = PURE_EXPR(GenTemp()); 
+
+		if ($1.sym->initial_value != 0 && $3.sym->initial_value != 0) {
+			$$.sym->initial_value = $1.sym->initial_value * $3.sym->initial_value;
+		} else {
+			Emit(BinOp(MUL, ASym($$), ASym($1), ASym($3)));
+		}
+	}
+	| multiplicative_expression '/' unary_expression {
+		$$ = PURE_EXPR(GenTemp()); 
+		
+		if ($1.sym->initial_value != 0 && $3.sym->initial_value != 0) {
+			$$.sym->initial_value = $1.sym->initial_value / $3.sym->initial_value;
+		} else {
+			Emit(BinOp(DIV, ASym($$), ASym($1), ASym($3)));
+		}
+	}
+	| multiplicative_expression '%' unary_expression {
+		$$ = PURE_EXPR(GenTemp()); 
+		
+		if ($1.sym->initial_value != 0 && $3.sym->initial_value != 0) {
+			$$.sym->initial_value = $1.sym->initial_value % $3.sym->initial_value;
+		} else {
+			Emit(BinOp(MOD, ASym($$), ASym($1), ASym($3)));
+		}		
+	}
 
 additive_expression:
 	multiplicative_expression
-	| additive_expression '+' multiplicative_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(ADD, ASym($$), ASym($1), ASym($3)));}
-	| additive_expression '-' multiplicative_expression {$$ = PURE_EXPR(GenTemp()); Emit(BinOp(SUB, ASym($$), ASym($1), ASym($3)));}
+	| additive_expression '+' multiplicative_expression {
+		$$ = PURE_EXPR(GenTemp()); 
+		
+		if ($1.sym->initial_value != 0 && $3.sym->initial_value != 0) {
+			$$.sym->initial_value = $1.sym->initial_value + $3.sym->initial_value;
+		} else {
+			Emit(BinOp(ADD, ASym($$), ASym($1), ASym($3)));
+		}
+	}
+	| additive_expression '-' multiplicative_expression {
+		$$ = PURE_EXPR(GenTemp()); 
+	
+		if ($1.sym->initial_value != 0 && $3.sym->initial_value != 0) {
+			$$.sym->initial_value = $1.sym->initial_value - $3.sym->initial_value;
+		} else {
+			Emit(BinOp(SUB, ASym($$), ASym($1), ASym($3)));
+		}
+	}
 
 relational_expression:
 	additive_expression
