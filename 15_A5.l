@@ -2,8 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 #ifndef NO_YY
-	#include "15_A4_translator.h"
-	#include "15_A4.tab.h"
+	#include "15_A5_translator.h"
+	#include "15_A5.tab.h"
 #endif
 %}
 

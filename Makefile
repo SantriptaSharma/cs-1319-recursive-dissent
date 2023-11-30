@@ -7,7 +7,7 @@ o=translator
 lx=lexer
 
 team=15
-assignment=4
+assignment=5
 
 testfile=testthing.nc
 

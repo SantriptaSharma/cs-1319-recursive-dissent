@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "15_A4_translator.h"
+#include "15_A5_translator.h"
 
 extern int yyparse();
 extern void yyerror(char *s);
@@ -701,6 +701,7 @@ void DestroyArgList(ArgList *list) {
 	}
 }
 
+// TODO: take cli input for infile & outfile names
 int main() {
 	InitLists();
 	InitQuads();
@@ -710,6 +711,14 @@ int main() {
 	
 	SymTableDispl(current_table);
 	DisplayQuads();
+
+	// TODO: write quads to file
+	// TODO: append input lib declarations to symbol table
+
+	// TODO: put input lib into asm (extra cred)
+	// TODO: generate asm from quads
+
+	// TODO: write asm to file
 
 	FreeTables();
 	FreeQuads();
