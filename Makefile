@@ -3,7 +3,7 @@ l=flex
 yy=bison
 CFLAGS=-Werror -lfl -g
 
-o=translator
+o=compiler
 lx=lexer
 
 team=15
@@ -15,8 +15,9 @@ fname=$(team)_A$(assignment)
 
 build: $(o)
 
-test: build
-	./$(o) < $(testfile)
+# TODO: write this according to spec
+# test: build
+# 	./$(o) < $(testfile)
 
 $(o): $(fname)_translator.o $(fname).tab.o $(lx).o compiler.o
 	$(CC) -o $@ $^ $(CFLAGS)
@@ -34,7 +35,8 @@ $(lx).c: $(fname).l $(fname).tab.c
 	$(CC) -c $^ $(CFLAGS)
 
 clean: 
-	rm -rf $(o)*
+	rm -rf $(o)
+	rm -rf $(o).exe
 	rm -rf $(lx)*
 	rm -rf *.o
 	rm -rf $(fname).tab.*

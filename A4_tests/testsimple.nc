@@ -5,6 +5,7 @@ char ithmetic2 = charithmetic - 'd';
 int arithmetic = ithmetic2 + 5;
 char d = +'c';
 char f = -'f';
+void *thing = &GLOB;
 
 void printf(char *c, int argv);
 

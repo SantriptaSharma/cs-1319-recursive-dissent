@@ -684,7 +684,7 @@ compound_statement:
 	
 block_item_list:
 	block_item
-	| block_item_list marker block_item { Backpatch($1, $2); $$ = $3; Backpatch($$, quads_size); Emit(JmpLabel()); }
+	| block_item_list marker block_item { Backpatch($1, $2); $$ = $3; Backpatch($$, quads_size); }
 
 block_item:
 	declaration { $$ = NULL; }

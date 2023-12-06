@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 extern int yylex();
+int y = 10;
 
 int main() {
 	int c;
