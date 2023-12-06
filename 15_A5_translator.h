@@ -16,6 +16,8 @@ typedef struct _Addr {
 	};
 } Addr;
 
+extern int label_count;
+
 // Used for true, false, and next lists within symbols
 typedef struct _QuadList {
 	int quad_index;
@@ -78,6 +80,7 @@ void Emit(Quad q);
 #define IndexWrite(dest, index, source) ((Quad){INDW, source, index, dest})
 #define DerefWrite(dest, source) ((Quad){PTRW, dest, AImm(0), source})
 #define FnLabel(label) ((Quad){FN_LABEL, AImm(0), AImm(0), label})
+#define JmpLabel() ((Quad){FN_LABEL, AImm(0), AImm(0), AImm(label_count++)})
 
 // Functions for printing a quad & the quads list
 void DisplayQuad(Quad q);

@@ -18,7 +18,7 @@ build: $(o)
 test: build
 	./$(o) < $(testfile)
 
-$(o): $(fname)_translator.o $(fname).tab.o $(lx).o
+$(o): $(fname)_translator.o $(fname).tab.o $(lx).o compiler.o
 	$(CC) -o $@ $^ $(CFLAGS)
 
 $(lx): lexmain.o $(lx).o

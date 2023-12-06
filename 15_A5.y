@@ -113,7 +113,7 @@
 
 %%
 /* auxiliary symbols */
-marker: { $$ = quads_size; } // just store the quad index of the next instruction on reduction
+marker: { $$ = quads_size; Emit(JmpLabel()); } // just store the quad index of the next instruction on reduction
 guard: { $$ = MakeList(quads_size); Emit(Jump(AImm(0))); } // emit an unconditional jump, and store a next list to be filled in by rules that use guards
 
 /* expressions */
@@ -467,13 +467,16 @@ conditional_expression:
 
 		$$ = PURE_EXPR(GenTemp());
 		Backpatch($6, quads_size);
+		Emit(JmpLabel());
 		Emit(Mov(ASym($$), ASym($5)));
 		size_t q = quads_size;
 		Emit(Jump(AImm(0)));
 
 		Backpatch($10, quads_size);
+		Emit(JmpLabel());
 		Emit(Mov(ASym($$), ASym($9)));
 		quads[q].rd.imm = quads_size;
+		Emit(JmpLabel());
 	}
 
 assignment_expression:
@@ -681,7 +684,7 @@ compound_statement:
 	
 block_item_list:
 	block_item
-	| block_item_list marker block_item { Backpatch($1, $2); $$ = $3; Backpatch($$, quads_size); }
+	| block_item_list marker block_item { Backpatch($1, $2); $$ = $3; Backpatch($$, quads_size); Emit(JmpLabel()); }
 
 block_item:
 	declaration { $$ = NULL; }
@@ -716,12 +719,24 @@ selection_statement:
 	}
 
 iteration_statement:
-	FOR '(' opt_expression ';' marker opt_expression ';' marker opt_expression guard ')' marker statement {
-		QuadList *tl = $6.has_expr ? $6.expr.truelist : NULL;
+	FOR '(' opt_expression ';' marker opt_expression {
+		if (!$6.has_expr) {
+			$6.has_expr = 1;
+			$6.expr = BOOL_EXPR(GenTemp(), MakeList(quads_size), NULL);
+			Emit(Jump(AImm(0)));
+		}
+	} ';' marker opt_expression guard ')' marker statement {
+		QuadList *tl = $6.expr.truelist;
+		
+		if (tl == NULL) {
+			tl = MakeList(quads_size);
+			Emit(Jump(AImm(0)));
+		}
+
 		QuadList *fl = $6.has_expr ? $6.expr.falselist : NULL;
 
-		Backpatch(tl, $12); Backpatch($10, $5); Backpatch($13, $8);
-		Emit(Jump(AImm($8)));
+		Backpatch(tl, $13); Backpatch($11, $5); Backpatch($14, $9);
+		Emit(Jump(AImm($9)));
 		$$ = fl;
 	}
 	
@@ -733,6 +748,8 @@ jump_statement:
 		} 
 		
 		$$ = NULL;
+
+		Emit(JmpLabel());
 
 		if ($2.has_expr == 1) {
 			Emit(Mov(((Addr){SYMBOL_A, .sym = SymLookup("__retval", 0)}), ASym($2.expr)));
@@ -788,9 +805,14 @@ function_definition:
 
 		if (quads[quads_size - 1].opcode != RET) {
 			Backpatch($4, quads_size);
+			Emit(JmpLabel());
 			Emit(Return(AImm(0)));
 		} else {
-			Backpatch($4, quads_size - 1);
+			if (quads[quads_size-2].opcode == MOV) {
+				Backpatch($4, quads_size - 3);
+			} else {
+				Backpatch($4, quads_size - 2);
+			}
 		}
 	}
 %%

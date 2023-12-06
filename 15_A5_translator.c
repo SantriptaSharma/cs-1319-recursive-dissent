@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "15_A5_translator.h"
+#include "compiler.h"
 
 extern int yyparse();
 extern void yyerror(char *s);
@@ -9,6 +10,8 @@ extern void yyerror(char *s);
 const unsigned int size_of_char = 1;
 const unsigned int size_of_int = 4;
 const unsigned int size_of_pointer = 4;
+
+int label_count = 0;
 
 int quads_size = 0, quads_capacity = 64;
 Quad *quads;
@@ -231,14 +234,17 @@ void DisplayQuad(Quad q) {
 			DisplayAddr(q.rs);
 		break;
 		case FN_LABEL:
-			printf("%s:", q.rd.sym->name);
+			if (q.rd.kind == SYMBOL_A)
+				printf("%s:", q.rd.sym->name);
+			else
+				printf("_L_%d_:", q.rd.imm);
 		break;
 	}
 }
 
 void DisplayQuads() {
 	for (int i = 0; i < quads_size; i++) {
-		if (quads[i].opcode == FN_LABEL) printf("\n");
+		if (quads[i].opcode == FN_LABEL && quads[i].rd.kind == SYMBOL_A) printf("\n");
 		printf("%d: ", i);
 		DisplayQuad(quads[i]);
 		printf("\n");
@@ -715,6 +721,30 @@ int main() {
 	
 	SymTableDispl(current_table);
 	DisplayQuads();
+
+	char valid = 1;
+
+	// Verify quads: the target of each jump is a label
+	for (int i = 0; i < quads_size; i++) {
+		Quad q = quads[i];
+		if (q.opcode == JMP || q.opcode == JIF || q.opcode == JNT 
+		|| q.opcode == JLT || q.opcode == JGT || q.opcode == JEQ 
+		|| q.opcode == JNE || q.opcode == JLE || q.opcode == JGE) {
+			int ind = q.rd.imm;
+			if (quads[ind].opcode != FN_LABEL) {
+				printf("On quad %d, jump target %d is not a label\n", i, ind);
+				valid = 0;
+			}
+		}
+	}
+
+	if (!valid) {
+		printf("Quads are invalid, aborting\n");
+		FreeTables();
+		FreeQuads();
+		DestroyLists();
+		return 1;
+	}
 
 	// TODO: write quads to file
 	// TODO: append input lib declarations to symbol table

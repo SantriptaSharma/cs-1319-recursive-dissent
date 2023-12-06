@@ -1,5 +1,10 @@
 int GLOB = 1;
 char POPPING_thing = 'c';
+char charithmetic = (POPPING_thing + 'd') - 'c';
+char ithmetic2 = charithmetic - 'd';
+int arithmetic = ithmetic2 + 5;
+char d = +'c';
+char f = -'f';
 
 void printf(char *c, int argv);
 
