@@ -7,7 +7,19 @@ char d = +'c';
 char f = -'f';
 void *thing = &GLOB;
 
-void printf(char *c, int argv);
+void printf(char *c, int argv) {
+	int j;
+	j = 5;
+}
+
+int a = 5 + 3 + "garbo king";
+int *e = a + 5;
+int *make_fib_list(int a, int b, int n);
+int b = 110 + 'c' + "garbo king" + a;
+void garbo();
+char c = (e[10] + 12) * 32 - 3 * 4 * "okiii";
+void garbo();
+
 
 int main(int argc, char *argv) {
 	int i;

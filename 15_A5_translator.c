@@ -8,8 +8,8 @@ extern int yyparse();
 extern void yyerror(char *s);
 
 const unsigned int size_of_char = 1;
-const unsigned int size_of_int = 4;
-const unsigned int size_of_pointer = 4;
+const unsigned int size_of_int = sizeof (int);
+const unsigned int size_of_pointer = sizeof(void *);
 
 int label_count = 0;
 
@@ -633,11 +633,11 @@ Symbol *GenTemp()
 		
 		sym->name = strdup(name);
 		sym->type = (Type) {
-			.kind = PRIMITIVE_T,
-			.primitive = INT_T
+			.kind = PRIMITIVE_PTR,
+			.primitive = VOID_T
 		};
 		sym->initial_value = 0;
-		sym->size = size_of_int;
+		sym->size = size_of_pointer;
 		sym->offset = 0;
 		sym->inner_table = NULL;
 		sym->next = NULL;
@@ -645,9 +645,9 @@ Symbol *GenTemp()
 		SymInsert(sym);
 	}
 
-	sym->type.kind = PRIMITIVE_T;
+	sym->type.kind = PRIMITIVE_PTR;
 	sym->is_temp = 1;
-	sym->type.primitive = INT_T;
+	sym->type.primitive = VOID_T;
 
 	sym->size = GetSize(sym->type);
 
@@ -760,6 +760,7 @@ int main(int argc, const char *argv[]) {
 	sprintf(asm_filename, "%s.asm", argv[1]);
 
 	FILE *quads_file = fopen(out_filename, "w");
+	free(out_filename);
 	if (quads_file == NULL) {
 		printf("Could not open output file %s\n", out_filename);
 		FreeTables();
@@ -797,27 +798,27 @@ int main(int argc, const char *argv[]) {
 	FILE *file = fopen(asm_filename, "w");
 	if (file == NULL) {
 		printf("Could not open output file %s\n", asm_filename);
+		free(asm_filename);
 		FreeTables();
 		FreeQuads();
 		DestroyLists();
 		return 1;
 	}
+	free(asm_filename);
 
-	if (!WriteDataSeg(file)) {
-		printf("Could not write data segment, aborting\n");
-		fclose(file);
-		FreeTables();
-		FreeQuads();
-		DestroyLists();
-		return 1;
-	}
+	WriteDataSeg(file);
+
+	// generate entry point, emit all global instructions
+	fprintf(file, ".text\n");
+	fprintf(file, ".global main\n");
+
+	WriteEntryPoint(file);
 
 	// TODO: generate asm from quads
 
 	// TODO: write asm to file
 
-	free(out_filename);
-	free(asm_filename);
+	fclose(file);
 	FreeTables();
 	FreeQuads();
 	DestroyLists();

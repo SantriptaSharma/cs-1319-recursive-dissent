@@ -145,9 +145,9 @@ postfix_expression:
 
 		enum KIND_T kind = $1.sym->type.kind == ARRAY_PTR ? PRIMITIVE_PTR : PRIMITIVE_T;
 		$$ = PURE_EXPR(SymInit(kind));
-		size_t len = strlen($1.sym->name) + 15;
+		size_t len = strlen($1.sym->name) + 18;
 		char *name = malloc(len);
-		sprintf(name, "%s__[%d]", $1.sym->name, current_table->temp_count++);
+		sprintf(name, "%s__ind_%d_", $1.sym->name, current_table->temp_count++);
 		$$.sym->name = name;
 		$$.sym->type = $1.sym->type.kind == PRIMITIVE_PTR ? prim2type($1.sym->type.primitive) : prim2type($1.sym->type.array.base);
 		$$.sym->size = GetSize($$.sym->type);
@@ -244,9 +244,9 @@ unary_expression:
 		}
 		
 		enum KIND_T kind = $2.sym->type.kind == ARRAY_PTR ? ARRAY_T : PRIMITIVE_T;
-		size_t len = strlen($2.sym->name) + 4;
+		size_t len = strlen($2.sym->name) + 8;
 		char *name = malloc(len);
-		sprintf(name, "*__%s", $2.sym->name);
+		sprintf(name, "deref__%s", $2.sym->name);
 
 		$$ = PURE_EXPR(SymInit(kind));
 
