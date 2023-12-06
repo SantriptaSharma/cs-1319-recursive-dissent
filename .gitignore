@@ -3,6 +3,7 @@
 
 # generated files
 *.exe
+compiler
 translator
 parser
 lexer.c

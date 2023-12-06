@@ -2,3 +2,6 @@
 
 #include "compiler.h"
 
+char WriteDataSegment(FILE *file) {
+	
+}

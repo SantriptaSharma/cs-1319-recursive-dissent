@@ -83,7 +83,7 @@ void Emit(Quad q);
 #define JmpLabel() ((Quad){FN_LABEL, AImm(0), AImm(0), AImm(label_count++)})
 
 // Functions for printing a quad & the quads list
-void DisplayQuad(Quad q);
+void DisplayQuad(Quad q, FILE *file);
 void DisplayQuads();
 
 typedef struct _SymbolTable {

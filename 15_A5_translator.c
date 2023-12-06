@@ -125,49 +125,49 @@ void Emit(Quad q) {
 	quads[quads_size++] = q;
 }
 
-static void DisplayAddr(Addr a) {
+static void DisplayAddr(Addr a, FILE *file) {
 	switch (a.kind) {
-		case IMMEDIATE: printf("%d", a.imm); break;
-		case SYMBOL_A: printf("%s", a.sym->name); if(a.sym->initial_value != 0) printf("(%d)", a.sym->initial_value); break;
+		case IMMEDIATE: fprintf(file, "%d", a.imm); break;
+		case SYMBOL_A: fprintf(file, "%s", a.sym->name); if(a.sym->initial_value != 0) fprintf(file, "(%d)", a.sym->initial_value); break;
 	}
 }
 
-void DisplayQuad(Quad q) {
+void DisplayQuad(Quad q, FILE *file) {
 	switch (q.opcode) {
 		case ADD:
 		case SUB:
 		case MUL:
 		case DIV:
 		case MOD:
-			DisplayAddr(q.rd);
-			printf(" = ", q.rd.sym->name);
-			DisplayAddr(q.rs);
-			printf(" %s ", OpSym[q.opcode]);
-			DisplayAddr(q.rt);
+			DisplayAddr(q.rd, file);
+			fprintf(file, " = ", q.rd.sym->name);
+			DisplayAddr(q.rs, file);
+			fprintf(file, " %s ", OpSym[q.opcode]);
+			DisplayAddr(q.rt, file);
 		break;
 		case POS:
 		case NEG:
 		case ADDR:
 		case DEREF:
-			DisplayAddr(q.rd);
-			printf(" = %s", OpSym[q.opcode]);
-			DisplayAddr(q.rs);
+			DisplayAddr(q.rd, file);
+			fprintf(file, " = %s", OpSym[q.opcode]);
+			DisplayAddr(q.rs, file);
 		break;
 		case JMP:
-			printf("goto ");
-			DisplayAddr(q.rd);
+			fprintf(file, "goto ");
+			DisplayAddr(q.rd, file);
 		break;
 		case JIF:
-			printf("if ");
-			DisplayAddr(q.rs);
-			printf(" goto ");
-			DisplayAddr(q.rd);
+			fprintf(file, "if ");
+			DisplayAddr(q.rs, file);
+			fprintf(file, " goto ");
+			DisplayAddr(q.rd, file);
 		break;
 		case JNT:
-			printf("ifFalse ");
-			DisplayAddr(q.rs);
-			printf(" goto ");
-			DisplayAddr(q.rd);
+			fprintf(file, "ifFalse ");
+			DisplayAddr(q.rs, file);
+			fprintf(file, " goto ");
+			DisplayAddr(q.rd, file);
 		break;
 		case JLT:
 		case JGT:
@@ -175,69 +175,69 @@ void DisplayQuad(Quad q) {
 		case JNE:
 		case JLE:
 		case JGE:
-			printf("if ");
-			DisplayAddr(q.rs);
-			printf(" %s ", OpSym[q.opcode]);
-			DisplayAddr(q.rt);
-			printf(" goto ");
-			DisplayAddr(q.rd);
+			fprintf(file, "if ");
+			DisplayAddr(q.rs, file);
+			fprintf(file, " %s ", OpSym[q.opcode]);
+			DisplayAddr(q.rt, file);
+			fprintf(file, " goto ");
+			DisplayAddr(q.rd, file);
 		break;
 		case PAR:
-			printf("param ");
-			DisplayAddr(q.rs);
+			fprintf(file, "param ");
+			DisplayAddr(q.rs, file);
 		break;
 		case CAL:
 			if (q.rs.kind == SYMBOL_A) {
-				DisplayAddr(q.rs);
-				printf(" = call ");
-				DisplayAddr(q.rd);
-				printf(", ");
-				DisplayAddr(q.rt);
+				DisplayAddr(q.rs, file);
+				fprintf(file, " = call ");
+				DisplayAddr(q.rd, file);
+				fprintf(file, ", ");
+				DisplayAddr(q.rt, file);
 			} else if (q.rs.kind == IMMEDIATE) {
-				printf("call ");
-				DisplayAddr(q.rd);
-				printf(", ");
-				DisplayAddr(q.rt);
+				fprintf(file, "call ");
+				DisplayAddr(q.rd, file);
+				fprintf(file, ", ");
+				DisplayAddr(q.rt, file);
 			}
 		break;
 		case RET:
-			printf("return");
+			fprintf(file, "return");
 			if (q.rs.kind != IMMEDIATE) {
-				printf(" ");
-				DisplayAddr(q.rs);
+				fprintf(file, " ");
+				DisplayAddr(q.rs, file);
 			}
 		break;
 		case INDR:
-			DisplayAddr(q.rd);
-			printf(" = ");
-			DisplayAddr(q.rs);
-			printf("[");
-			DisplayAddr(q.rt);
-			printf("]");
+			DisplayAddr(q.rd, file);
+			fprintf(file, " = ");
+			DisplayAddr(q.rs, file);
+			fprintf(file, "[");
+			DisplayAddr(q.rt, file);
+			fprintf(file, "]");
 		break;
 		case INDW:
-			DisplayAddr(q.rd);
-			printf("[");
-			DisplayAddr(q.rs);
-			printf("] = ");
-			DisplayAddr(q.rt);
+			DisplayAddr(q.rd, file);
+			fprintf(file, "[");
+			DisplayAddr(q.rs, file);
+			fprintf(file, "] = ");
+			DisplayAddr(q.rt, file);
 		break;
 		case PTRW:
-			printf("*");
-			DisplayAddr(q.rd);
-			printf(" = ");
-			DisplayAddr(q.rs);
+			fprintf(file, "*");
+			DisplayAddr(q.rd, file);
+			fprintf(file, " = ");
+			DisplayAddr(q.rs, file);
 		break;
 		case MOV:
-			DisplayAddr(q.rd);
-			printf(" = ");
-			DisplayAddr(q.rs);
+			DisplayAddr(q.rd, file);
+			fprintf(file, " = ");
+			DisplayAddr(q.rs, file);
 		break;
 		case FN_LABEL:
 			if (q.rd.kind == SYMBOL_A)
-				printf("%s:", q.rd.sym->name);
+				fprintf(file, "%s:", q.rd.sym->name);
 			else
-				printf("_L_%d_:", q.rd.imm);
+				fprintf(file, "_L_%d_:", q.rd.imm);
 		break;
 	}
 }
@@ -246,7 +246,7 @@ void DisplayQuads() {
 	for (int i = 0; i < quads_size; i++) {
 		if (quads[i].opcode == FN_LABEL && quads[i].rd.kind == SYMBOL_A) printf("\n");
 		printf("%d: ", i);
-		DisplayQuad(quads[i]);
+		DisplayQuad(quads[i], stdout);
 		printf("\n");
 	}
 	printf("\n");
@@ -711,8 +711,7 @@ void DestroyArgList(ArgList *list) {
 	}
 }
 
-// TODO: take cli input for infile & outfile names
-int main() {
+int main(int argc, const char *argv[]) {
 	InitLists();
 	InitQuads();
 	InitTables();
@@ -746,14 +745,79 @@ int main() {
 		return 1;
 	}
 
-	// TODO: write quads to file
-	// TODO: append input lib declarations to symbol table
+	if (argc < 2) {
+		printf("No output file specified, early exit before compilation\n");
+		FreeTables();
+		FreeQuads();
+		DestroyLists();
+		return 0;
+	}
 
-	// TODO: put input lib into asm (extra cred)
+	size_t filename_len = strlen(argv[1]);
+	char *out_filename = malloc(filename_len + 5);
+	char *asm_filename = malloc(filename_len + 5);
+	sprintf(out_filename, "%s.out", argv[1]);
+	sprintf(asm_filename, "%s.asm", argv[1]);
+
+	FILE *quads_file = fopen(out_filename, "w");
+	if (quads_file == NULL) {
+		printf("Could not open output file %s\n", out_filename);
+		FreeTables();
+		FreeQuads();
+		DestroyLists();
+		return 1;
+	}
+
+	for (int i = 0; i < quads_size; i++) {
+		if (quads[i].opcode == FN_LABEL && quads[i].rd.kind == SYMBOL_A) fprintf(quads_file, "\n");
+		fprintf(quads_file, "%d: ", i);
+		DisplayQuad(quads[i], quads_file);
+		fprintf(quads_file, "\n");
+	}
+
+	fclose(quads_file);
+
+	if (current_table != &glb_table) {
+		printf("Current table is not global, aborting\n");
+		FreeTables();
+		FreeQuads();
+		DestroyLists();
+		return 1;
+	}
+
+	Symbol *sym = SymLookup("main", 1);
+	if (sym == NULL || sym->type.kind != FUNC_T) {
+		printf("No main function found, aborting\n");
+		FreeTables();
+		FreeQuads();
+		DestroyLists();
+		return 1;
+	}
+
+	FILE *file = fopen(asm_filename, "w");
+	if (file == NULL) {
+		printf("Could not open output file %s\n", asm_filename);
+		FreeTables();
+		FreeQuads();
+		DestroyLists();
+		return 1;
+	}
+
+	if (!WriteDataSeg(file)) {
+		printf("Could not write data segment, aborting\n");
+		fclose(file);
+		FreeTables();
+		FreeQuads();
+		DestroyLists();
+		return 1;
+	}
+
 	// TODO: generate asm from quads
 
 	// TODO: write asm to file
 
+	free(out_filename);
+	free(asm_filename);
 	FreeTables();
 	FreeQuads();
 	DestroyLists();
