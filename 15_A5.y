@@ -523,7 +523,7 @@ declaration:
 			break;
 		}
 
-		if ($1 == VOID_T && $$.sym->type.kind != FUNC_T) {
+		if ($1 == VOID_T && $$.sym->type.kind != FUNC_T && $$.sym->type.kind != PRIMITIVE_PTR && $$.sym->type.kind != ARRAY_PTR) {
 			yyerror("void is zero-sized!");
 			YYABORT;
 		}

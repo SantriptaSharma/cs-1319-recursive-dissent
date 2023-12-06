@@ -324,8 +324,12 @@ int GetSize(Type type) {
 		break;
 
 		case PRIMITIVE_PTR:
-		case ARRAY_PTR:
 			return size_of_pointer;
+		break;
+
+		// semantically make more sense as pointer arrays and not array pointers, sorry
+		case ARRAY_PTR:
+			return size_of_pointer * type.array.size;
 		break;
 
 		case ARRAY_T:
