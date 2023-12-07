@@ -35,7 +35,7 @@ $(lx).c: $(fname).l $(fname).tab.c
 	$(CC) -c $^ $(CFLAGS)
 
 testexec: build
-	./$(o) test < compilertest.nc
+	./$(o) test 0 < compilertest.nc
 	gcc -c test.s $(SFLAGS)
 	gcc -o testexec test.o $(SFLAGS)
 

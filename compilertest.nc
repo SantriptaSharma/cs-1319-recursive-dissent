@@ -50,32 +50,32 @@
 // 	return r;
 // }
 
-int main() {
-    int a = 5;
-    int *num;
-    int *num2 = 10;
-    num2 = num2 + 1;
-
-    a = -a;
-
-    if (a != -5) return 1;
-
-    a = -a;
-
-    if (a != 5) return 1;
-
-    a = a;
-
-    if (a != 5) return 1;
-
-    int b = num;
-
-    num = &a;
-    a = *num;
-
-    if (a != 5) return 1;
-    if (*num != 5) return 1;
-
-    *num = 10;
-    return a == 10 ? 0 : 1;
-}
+// int main() {
+//     int a = 5;
+//     int *num;
+//     int *num2 = 10;
+//     num2 = num2 + 1;
+// 
+//     a = -a;
+// 
+//     if (a != -5) return 1;
+// 
+//     a = -a;
+// 
+//     if (a != 5) return 1;
+// 
+//     a = a;
+// 
+//     if (a != 5) return 1;
+// 
+//     int b = num;
+// 
+//     num = &a;
+//     a = *num;
+// 
+//     if (a != 5) return 1;
+//     if (*num != 5) return 1;
+// 
+//     *num = 10;
+//     return a == 10 ? 0 : 1;
+// }

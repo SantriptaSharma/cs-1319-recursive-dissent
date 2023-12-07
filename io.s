@@ -19,11 +19,20 @@ main:
 	int $0x80
 
 printStr:
+	lea 8(%rsp), %rdi
+	mov $0, %rsi
+	count_loop:
+		cmpb $0, (%rdi)
+		je count_end
+		inc %rdi
+		inc %rsi
+		jmp count_loop
+	count_end:
+
 	mov $0x4, %rax
 	mov $1, %rbx
 	mov 8(%rsp), %rcx
-	# TODO:dynamically calc length
-	mov $14, %rdx
+	mov %rsi, %rdx
 	int $0x80
 	ret
 
