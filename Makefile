@@ -35,7 +35,7 @@ $(lx).c: $(fname).l $(fname).tab.c
 %.o: %.c
 	$(CC) -c $^ $(CFLAGS)
 
-ltest: build
+testexec: build
 	./$(o) test < compilertest.nc
 	gcc -c test.s $(SFLAGS)
 	gcc -o testexec test.o $(SFLAGS)
@@ -46,5 +46,6 @@ clean:
 	rm -rf $(lx)*
 	rm -rf *.o
 	rm -rf $(fname).tab.*
+	rm -rf test.s test.o test.out testexec
 
-.PHONY: default clean build lex test
+.PHONY: default clean build lex

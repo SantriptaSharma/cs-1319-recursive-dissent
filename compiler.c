@@ -5,6 +5,7 @@
 #include "compiler.h"
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((b) > (a) ? (a) : (b))
 
 const char *CONST_DIRECTIVES[] = {
 	[1] = ".byte",
@@ -12,6 +13,10 @@ const char *CONST_DIRECTIVES[] = {
 	[4] = ".long",
 	[8] = ".quad"
 };
+
+static char prefix(const char *pre, const char *str) {
+	return strncmp(pre, str, strlen(pre)) == 0;
+}
 
 static void WriteGlobalSym(Symbol *sym, FILE *file) {
 	static int strings_count = 0;
@@ -29,16 +34,9 @@ static void WriteGlobalSym(Symbol *sym, FILE *file) {
 
 		case ARRAY_T:
 			if (sym->type.array.base == CHAR_T) {
-				size_t it = 0;
-				const char *pref = "__str_";
-
-				while (sym->name[it] == pref[it]) {
-					it++;
-				}
-
-				if (pref[it] == '\0') {
+				if (prefix("__str_", sym->name)) {
 					sym->initial_value = strings_count++;
-					fprintf(file, "_user_string_%d:\n\t.string \"%s\"\n", sym->initial_value, sym->name + it);
+					fprintf(file, "_user_string_%d:\n\t.string \"%s\"\n", sym->initial_value, sym->name + 6);
 				} else {
 					fprintf(file, ".global %s\n", sym->name);
 					fprintf(file, "%s:\n\t.zero %d\n", sym->name, sym->size);
@@ -196,14 +194,7 @@ static void TranslateOperand(Addr a, FILE *file) {
 			
 			// if the symbol is a string literal
 			if (a.sym->type.kind == ARRAY_T && a.sym->type.array.base == CHAR_T) {
-				size_t it = 0;
-				const char *pref = "__str_";
-
-				while (a.sym->name[it] == pref[it]) {
-					it++;
-				}
-
-				if (pref[it] == '\0') {
+				if (prefix("__str_", a.sym->name) == '\0') {
 					fprintf(file, "$_user_string_%d", a.sym->initial_value);
 					return;
 				}
@@ -222,6 +213,8 @@ static void TranslateOperand(Addr a, FILE *file) {
 			}
 
 			// check if symbol in glb table, if so, use variable
+			// to do this, we check whether it's in the func table, and if not
+			// it must be in the global table
 			Symbol *sym = SymLookup(a.sym->name, 0);
 
 			if (sym == NULL) {
@@ -255,11 +248,12 @@ static void LoadBinOps(Quad q, FILE *file) {
 	const char *extension_instr = q.rs.sym->initial_value == 0 ? 
 	(ss == 1 ? "movsx" : "movsxd") 
 	: "mov";
-	// sorry, but if the symbol is a constant, we can't use movsx/movsxd
+	// sorry for the ternary, but if the symbol is a constant, we can't use movsx/movsxd
 
 	if (q.opcode == DIV || q.opcode == MOD) {
 		// zero out rdx, upper 64 bits of the dividend
 		fprintf(file, "xor %%rdx, %%rdx\n\t");
+
 		fprintf(file, "%s ", extension_instr);
 		TranslateOperand(q.rs, file);
 		fprintf(file, ", %%rax\n\t");
@@ -274,12 +268,13 @@ static void LoadBinOps(Quad q, FILE *file) {
 		return;	
 	}
 
+	// load operands into r/eax and r/ebx, sign extending if necessary
 	fprintf(file, "mov%c ", movpostfix[ss]);
 	TranslateOperand(q.rs, file);
 	fprintf(file, ", %%%cax\n\t", regprefixes[ss]);
 
-	// sign extension
 
+	// sign extension
 	if (ss < sd && q.rs.sym->initial_value == 0) {
 		fprintf(file, "%s %%%cax, %%%cax\n\t", extension_instr, regprefixes[ss], regprefixes[sd]);
 	}
@@ -306,6 +301,40 @@ static const char *jumps[] = {
 
 #define JMPTO(q) (quads[q.rd.imm].rd.imm)
 
+static void TranslatePtrWrite(int it, FILE *file) {
+	Symbol *sym = NULL;
+	Quad q = quads[it];
+
+	// find the pointer, get the address this pointer points to
+	it--;
+	
+	while (it >= 0) {
+		if (quads[it].opcode == DEREF && quads[it].rd.sym == q.rd.sym) {
+			sym = quads[it].rs.sym;
+			break;
+		}
+		it--;
+	}
+
+	if (sym == NULL) {
+		printf("ERR: pointer write without pointer read\n");
+		return;
+	}
+
+	// put addr into rax
+	fprintf(file, "movq ");
+	TranslateOperand((Addr){.kind=SYMBOL_A, .sym = sym}, file);
+	fprintf(file, ", %%rax\n\t");
+
+	// put value into r/ebx
+	fprintf(file, "mov%c ", movpostfix[q.rs.sym->size], regprefixes[q.rs.sym->size]);
+	TranslateOperand(q.rs, file);
+	fprintf(file, ", %%%cbx\n\t", regprefixes[q.rs.sym->size]);
+
+	// write to addr
+	fprintf(file, "movl %%ebx, (%%rax)", regprefixes[q.rs.sym->size]);	
+}
+
 static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 	SymbolTable *saved = current_table;
 	current_table = tab;
@@ -313,6 +342,8 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 
 	switch (q.opcode) {
 		size_t sd, ss, st, remaining;
+		Symbol *sym;
+		int it;
 		
 		case ADD:
 		case SUB:
@@ -353,14 +384,54 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 		break;
 
 		case ADDR:
+			// if we are not in a function, this is just a global var
+			if(current_table == &glb_table) {
+				fprintf(file, "movq $%s, %%rax\n\t", q.rs.sym->name);
+				break;
+			}
+
+			// check if symbol in glb table, if so, use variable
+			// to do this, we check whether it's in the func table, and if not
+			// it must be in the global table
+			sym = SymLookup(q.rs.sym->name, 0);
+
+			if (sym == NULL) {
+				// must be in global table, only one level of nesting allowed
+				fprintf(file, "movq $%s, %%rax\n\t", q.rs.sym->name);
+				break;;
+			}
+
+			// otherwise, use offset(%rbp)
+			fprintf(file, "leaq %d(%%rbp), %%rax\n\t", GetOffset(sym));
+
+			fprintf(file, "movq %%rax, ");
+			TranslateOperand(q.rd, file);
+		break;
+
 		case DEREF:
-			// TODO:
+			fprintf(file, "movq ");
+			TranslateOperand(q.rs, file);
+			fprintf(file, ", %%rax\n\t");
+			fprintf(file, "movq (%%rax), %%rax\n\t");
+			fprintf(file, "movq %%rax, ");
+			TranslateOperand(q.rd, file);
 		break;
 
 		case NEG:
-		case POS:
-			// TODO:
+			fprintf(file, "movsxd ");
+			TranslateOperand(q.rs, file);
+			fprintf(file, ", %%rax\n\t");
+			fprintf(file, "negq %%rax\n\t");
+			fprintf(file, "movq %%rax, ");
+			TranslateOperand(q.rd, file);
+		break;
 
+		case POS:
+			fprintf(file, "movsxd ");
+			TranslateOperand(q.rs, file);
+			fprintf(file, ", %%rax\n\t");
+			fprintf(file, "movq %%rax, ");
+			TranslateOperand(q.rd, file);
 		break;
 
 		case JMP:
@@ -372,6 +443,7 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 			fprintf(file, "cmp $0, ");
 			TranslateOperand(q.rs, file);
 			fprintf(file, "\n\t");
+
 			fprintf(file, "j%s ", jumps[q.opcode]);
 			fprintf(file, "_L_%d_", JMPTO(q));
 		break;
@@ -382,12 +454,16 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 		case JGE:
 		case JEQ:
 		case JNE:
-			fprintf(file, "mov%c ", movpostfix[q.rs.sym->size]);
+			ss = q.rs.sym->size;
+
+			fprintf(file, "mov%c ", movpostfix[ss]);
 			TranslateOperand(q.rs, file);
-			fprintf(file, ", %%%cbx\n\t", regprefixes[q.rs.sym->size]);
-			fprintf(file, "cmp %%%cbx, ", regprefixes[q.rs.sym->size]);
+			fprintf(file, ", %%%cbx\n\t", regprefixes[ss]);
+
+			fprintf(file, "cmp ");
 			TranslateOperand(q.rt, file);
-			fprintf(file, "\n\t");
+			fprintf(file, ", %%%cbx\n\t", regprefixes[ss]);
+			
 			fprintf(file, "j%s ", jumps[q.opcode]);
 			fprintf(file, "_L_%d_", JMPTO(q));
 		break;
@@ -396,6 +472,7 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 			sd = q.rd.sym->size;
 			ss = q.rs.sym->size;
 
+			// retval is an alias for %r/eax
 			if (strcmp(q.rd.sym->name, "__retval") == 0) {
 				if (func_context.sym->type.func.return_type->kind == PRIMITIVE_T && func_context.sym->type.func.return_type->primitive == VOID_T) {
 					// do nothing
@@ -405,6 +482,12 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 				fprintf(file, "mov%c ", movpostfix[sd]);
 				TranslateOperand(q.rs, file);
 				fprintf(file, ", %%%cax", regprefixes[sd]);
+				break;
+			}
+
+			// if this is a ptr write
+			if (prefix("deref__", q.rd.sym->name)) {
+				TranslatePtrWrite(*i, file);
 				break;
 			}
 
@@ -421,7 +504,7 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 		break;
 
 		case PTRW:
-			// TODO:
+		printf("ERR: Should never get to PTRW\n");
 		break;
 	
 		case FN_LABEL:
@@ -444,7 +527,7 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 		case CAL:
 			// we have the number of parameters in q.rt.imm
 			remaining = q.rt.imm;
-			int it = *i - 1;
+			it = *i - 1;
 			while (remaining > 0 && quads[it].opcode == PAR) {
 				remaining--;
 				it--;
@@ -456,7 +539,7 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 				break;
 			}
 		
-			Symbol *sym = q.rd.sym->inner_table->sym_head;
+			sym = q.rd.sym->inner_table->sym_head;
 			size_t stacksize = 0, retval_size = 0;
 
 			while (sym != NULL) {
@@ -598,7 +681,7 @@ void WriteFunctions(FILE *file) {
 		fprintf(file, "mov %%rsp, %%rbp\n\n");
 		
 		while (sym != NULL) {
-			fprintf(file, "#\tlocal %s (%d =?= %d)\n\t", sym->name, func_context.stacksize + sym->size, GetOffset(sym));
+			fprintf(file, "#\tlocal %s (-%d =?= %d)\n\t", sym->name, func_context.stacksize + sym->size, GetOffset(sym));
 			fprintf(file, "sub $%d, %%rsp\n\t", sym->size);
 			
 			if (sym->type.kind == ARRAY_T || sym->type.kind == ARRAY_PTR) {
