@@ -4,5 +4,6 @@
 
 void WriteDataSeg(FILE *file);
 void WriteEntryPoint(FILE *file);
+void WriteFunctions(FILE *file);
 
 #endif

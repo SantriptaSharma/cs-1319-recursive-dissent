@@ -757,7 +757,7 @@ int main(int argc, const char *argv[]) {
 	char *out_filename = malloc(filename_len + 5);
 	char *asm_filename = malloc(filename_len + 5);
 	sprintf(out_filename, "%s.out", argv[1]);
-	sprintf(asm_filename, "%s.asm", argv[1]);
+	sprintf(asm_filename, "%s.s", argv[1]);
 
 	FILE *quads_file = fopen(out_filename, "w");
 	free(out_filename);
@@ -809,14 +809,11 @@ int main(int argc, const char *argv[]) {
 	WriteDataSeg(file);
 
 	// generate entry point, emit all global instructions
-	fprintf(file, ".text\n");
-	fprintf(file, ".global main\n");
-
 	WriteEntryPoint(file);
+	WriteFunctions(file);
 
-	// TODO: generate asm from quads
-
-	// TODO: write asm to file
+	// GAS syntax requires ending the file with a newline, not EOF
+	fprintf(file, "\n");
 
 	fclose(file);
 	FreeTables();

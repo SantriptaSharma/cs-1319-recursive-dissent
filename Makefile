@@ -2,6 +2,7 @@ CC=gcc
 l=flex
 yy=bison
 CFLAGS=-Werror -lfl -g
+SFLAGS=-no-pie -g
 
 o=compiler
 lx=lexer
@@ -34,6 +35,11 @@ $(lx).c: $(fname).l $(fname).tab.c
 %.o: %.c
 	$(CC) -c $^ $(CFLAGS)
 
+test: build
+	./$(o) test < compilertest.nc
+	gcc -c test.s $(SFLAGS)
+	gcc -o testexec test.o $(SFLAGS)
+
 clean: 
 	rm -rf $(o)
 	rm -rf $(o).exe
@@ -41,4 +47,4 @@ clean:
 	rm -rf *.o
 	rm -rf $(fname).tab.*
 
-.PHONY: default clean build lex
+.PHONY: default clean build lex test

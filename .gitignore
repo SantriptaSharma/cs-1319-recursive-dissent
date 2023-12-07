@@ -10,6 +10,8 @@ lexer.c
 parser.c
 *.tab.*
 *.o
+*.asm
+*.s
 
 #debugger files
 counterexamples
