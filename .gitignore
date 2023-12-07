@@ -9,6 +9,7 @@ parser
 lexer.c
 parser.c
 *.tab.*
+testexec
 *.o
 *.asm
 *.s

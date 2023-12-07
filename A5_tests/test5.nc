@@ -5,6 +5,8 @@ int * fun2(int b){
     return e;
 }
 
+// had to bring one of the functions up for it to be valid
+
 int fun(int c){
     if(c%d == 0) return fun2(c);
     else return fun(c+1);
