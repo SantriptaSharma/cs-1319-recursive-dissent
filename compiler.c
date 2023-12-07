@@ -138,15 +138,16 @@ static void FindQuadExtents() {
 }
 
 static const char postfixes[] = {
-	[1] = 'b', [2] = 'w', [4] = 'l', [8] = 'q'
+	[4] = 'l', [8] = 'q'
 };
 
+// redundant rn
 static const char movpostfix[] = {
-	[1] = 'l', [2] = 'l', [4] = 'l', [8] = 'q'
+	[4] = 'l', [8] = 'q'
 };
 
 static const char regprefixes[] = {
-	[1] = 'e', [4] = 'e', [8] = 'r'
+	[4] = 'e', [8] = 'r'
 };
 
 static const char *arithmetic_ops[] ={
@@ -160,20 +161,30 @@ static const char *arithmetic_ops[] ={
 // holds context for the current function being translated
 struct {
 	int argc;
-	//
-	int argstartoff;
+
+	// args above retval, retval never gets put into memory (alias for %rax)
+	int retvaloff;
+	
+	// after retval, first local var's offset
 	int localsoff;
+
+	// size of the stack frame, only locals included
+	int stacksize;
+
+	// function symbol
+	Symbol *sym;
 } func_context;
 
 static void TranslateOperand(Addr a, FILE *file) {
 	switch (a.kind) {
 		case SYMBOL_A:
+			// insert constants as they are
 			if (a.sym->initial_value != 0) {
 				fprintf(file, "$%d", a.sym->initial_value);
 				return;
 			}
 			
-			// check for string
+			// if the symbol is a string literal
 			if (a.sym->type.kind == ARRAY_T && a.sym->type.array.base == CHAR_T) {
 				size_t it = 0;
 				const char *pref = "__str_";
@@ -188,16 +199,42 @@ static void TranslateOperand(Addr a, FILE *file) {
 				}
 			}
 
+			// if we are not in a function, this is just a global var
 			if(current_table == &glb_table) {
-				fprintf(file, "%s", a.sym->name);
+				if (a.sym->type.kind == ARRAY_T || a.sym->type.kind == ARRAY_PTR) {
+					// the value of an array is its address
+					fprintf(file, "$%s", a.sym->name);
+				} else {
+					// return the variable
+					fprintf(file, "%s", a.sym->name);
+				}
 				return;
 			}
 
 			// check if symbol in glb table, if so, use variable
+			Symbol *sym = SymLookup(a.sym->name, 0);
+
+			if (sym == NULL) {
+				// must be in global table, only one level of nesting allowed
+				if (a.sym->type.kind == ARRAY_T || a.sym->type.kind == ARRAY_PTR) {
+					// the value of an array is its address
+					fprintf(file, "$%s", a.sym->name);
+				} else {
+					// return the literal value of the given variable
+					fprintf(file, "%s", a.sym->name);
+				}
+				return;
+			}
 
 			// otherwise, check if symbol is a parameter, if so, use +offset(%rbp)
+			// use func_context to figure this out
+			if (sym->offset < func_context.retvaloff) {
+				fprintf(file, "%d(%%rbp)", sym->offset - func_context.retvaloff - size_of_pointer);
+				return;
+			}
 
 			// otherwise, use -offset(%rbp)
+			fprintf(file, "-%d(%%rbp)", sym->offset - func_context.localsoff);
 		break;
 
 		case IMMEDIATE:
@@ -215,9 +252,10 @@ static void LoadBinOps(Quad q, FILE *file) {
 	const char *extension_instr = q.rs.sym->initial_value == 0 ? 
 	(ss == 1 ? "movsx" : "movsxd") 
 	: "mov";
-	// sorry
+	// sorry, but if the symbol is a constant, we can't use movsx/movsxd
 
 	if (q.opcode == DIV || q.opcode == MOD) {
+		// zero out rdx, upper 64 bits of the dividend
 		fprintf(file, "xor %%rdx, %%rdx\n\t");
 		fprintf(file, "%s ", extension_instr);
 		TranslateOperand(q.rs, file);
@@ -273,7 +311,7 @@ static void TranslateQuad(Quad q, FILE *file, SymbolTable *tab) {
 			// first we get the operands in rbx/ebx and rax/eax respectively (except for division, where it's flipped)
 			LoadBinOps(q, file);
 			// size for the operation
-			int size = MAX(q.rs.sym->size, q.rt.sym->size);
+			int size = MAX(ss, st);
 
 			// now we perform the operation
 
@@ -301,16 +339,17 @@ static void TranslateQuad(Quad q, FILE *file, SymbolTable *tab) {
 
 		case ADDR:
 		case DEREF:
+			// TODO:
 		break;
 
 		case NEG:
 		case POS:
-			fprintf(file, "%s%c\t", q.opcode == NEG ? "neg" : "not", postfixes[q.rd.sym->size]);
+			// TODO:
+			fprintf(file, "%s%c ", q.opcode == NEG ? "neg" : "not", postfixes[q.rd.sym->size]);
 			TranslateOperand(q.rs, file);
 		break;
 
 		case JMP:
-			
 		break;
 
 		case JIF:
@@ -334,6 +373,11 @@ static void TranslateQuad(Quad q, FILE *file, SymbolTable *tab) {
 			ss = q.rs.sym->size;
 
 			if (strcmp(q.rd.sym->name, "__retval") == 0) {
+				if (func_context.sym->type.func.return_type->kind == PRIMITIVE_T && func_context.sym->type.func.return_type->primitive == VOID_T) {
+					// do nothing
+					break;
+				}
+
 				fprintf(file, "mov%c ", movpostfix[sd]);
 				TranslateOperand(q.rs, file);
 				fprintf(file, ", %%%cax", regprefixes[sd]);
@@ -349,25 +393,30 @@ static void TranslateQuad(Quad q, FILE *file, SymbolTable *tab) {
 
 		case INDR:
 		case INDW:
+			// TODO:
 		break;
 
 		case PTRW:
+			// TODO:
 		break;
 	
 		case FN_LABEL:
-			fprintf(file, "%s:\n", q.rd.sym->name);
+			if (q.rd.kind == SYMBOL_A) 
+				fprintf(file, "%s:", q.rd.sym->name);
+			else
+				fprintf(file, "_L_%d_:", q.rd.imm);
 		break;
 
 		case RET:
-			fprintf(file, "ret\n");
+			fprintf(file, "jmp _f_%s_return_", func_context.sym->name);
 		break;
 
 		case PAR:
-
+			// TODO:
 		break;
 
 		case CAL:
-			fprintf(file, "call %s\n", q.rd.sym->name);
+			fprintf(file, "call %s", q.rd.sym->name);
 		break;
 	}
 
@@ -410,13 +459,82 @@ void WriteEntryPoint(FILE *file) {
 	fprintf(file, "\tmovl %%eax, %%ebx\n");
 	fprintf(file, "\tmovl $0x1, %%eax\n");
 	fprintf(file, "\tint $0x80\n");
-	fprintf(file, "\tjmp exit_loop\n");
+	fprintf(file, "\tjmp exit_loop\n\n");
 }
 
-void WriteFunction(FILE *file) {
-
+void WriteFunction(FILE *file, int i) {
+	for (int j = func_quad_blocks[i].start + 1; j <= func_quad_blocks[i].end; j++) {
+		fprintf(file, "#\t");
+		DisplayQuad(quads[j], file);
+		fprintf(file, "\n\t");
+		TranslateQuad(quads[j], file, func_context.sym->inner_table);
+		fprintf(file, "\n\n");
+	}
 }
 
 void WriteFunctions(FILE *file) {
+	for (int i = 0; i < func_count; i++) {
+		// write the function label
+		Quad q = quads[func_quad_blocks[i].start];
+		fprintf(file, "%s:\n", q.rd.sym->name);
 
+		// reset context
+		func_context.argc = 0;
+		func_context.retvaloff = 0;
+		func_context.localsoff = 0;
+		func_context.stacksize = 0;
+		func_context.sym = q.rd.sym;
+
+		Symbol *sym = q.rd.sym->inner_table->sym_head;
+		while (sym != NULL) {
+			if (strcmp(sym->name, "__retval") == 0) {
+				func_context.retvaloff = sym->offset;
+				func_context.localsoff = sym->offset + sym->size;
+				sym = sym->next;
+				break;
+			}
+
+			func_context.argc++;
+			sym = sym->next;
+		}
+
+		if (sym != NULL && sym->offset != func_context.localsoff) {
+			printf("Aborting: symbol table invalid somehow\n");
+			return;
+		}
+
+		// write the function prologue
+		fprintf(file, "#\tfunction prologue\n\t");
+		fprintf(file, "push %%rbp\n\t");
+		fprintf(file, "mov %%rsp, %%rbp\n\n");
+		
+		while (sym != NULL) {
+			fprintf(file, "#\tlocal %s (-%d = -%d)\n\t", sym->name, func_context.stacksize, sym->offset - func_context.localsoff);
+			fprintf(file, "movq	%%rsp, %%rax\n\t");
+			fprintf(file, "sub $%d, %%rsp\n\t", sym->size);
+			
+			if (sym->type.kind == ARRAY_T || sym->type.kind == ARRAY_PTR) {
+				// fill the array w zeros
+				fprintf(file, "mov $%d, %%rcx\n\t", sym->size);
+				fprintf(file, "mov %%rax, %%rdi\n\t");
+				fprintf(file, "xor %%eax, %%eax\n\t");
+				fprintf(file, "rep stosb\n\n");
+			} else {
+				fprintf(file, "mov%c $%d, (%%rax)\n\n", movpostfix[sym->size], sym->initial_value);
+			}
+
+			func_context.stacksize += sym->size;
+			sym = sym->next;
+		}
+
+		fprintf(file, "\n#\tfunction body\n\n");
+		WriteFunction(file, i);
+		
+		// write the function epilogue
+		fprintf(file, "#\tfunction epilogue\n\t");
+		fprintf(file, "_f_%s_return_:\n\t", func_context.sym->name);
+		fprintf(file, "mov %%rbp, %%rsp\n\t");
+		fprintf(file, "pop %%rbp\n\t");
+		fprintf(file, "ret\n\n");
+	}
 }
