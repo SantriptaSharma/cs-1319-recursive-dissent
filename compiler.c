@@ -264,7 +264,7 @@ static void LoadBinOps(Quad q, FILE *file) {
 
 		fprintf(file, "%s ", extension_instr);
 		TranslateOperand(q.rt, file);
-		fprintf(file, ", %%%cbx\n\t", regprefixes[st]);
+		fprintf(file, ", %%rbx\n\t", regprefixes[st]);
 		return;	
 	}
 
@@ -357,12 +357,12 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 			// first we get the operands in rbx/ebx and rax/eax respectively (except for division, where it's flipped)
 			LoadBinOps(q, file);
 			// size for the operation
-			int size = MAX(ss, st);
+			int size = sd;
 
 			// now we perform the operation
 
 			if (q.opcode == DIV || q.opcode == MOD) {
-				fprintf(file, "idiv %%%cbx\n\t", regprefixes[st]);
+				fprintf(file, "idiv %%%cbx\n\t", regprefixes[sd]);
 
 				if (q.opcode == DIV) {
 					fprintf(file, "mov%c %%rax, ", movpostfix[sd]);

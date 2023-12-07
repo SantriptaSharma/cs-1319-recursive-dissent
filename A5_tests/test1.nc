@@ -1,6 +1,4 @@
 int a;
 
-//added empty main function
-int main() {
-	
-}
+// added main func, our compiler refuses to compile without a main function
+int main() {}

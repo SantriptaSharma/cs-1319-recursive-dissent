@@ -757,7 +757,7 @@ int main(int argc, const char *argv[]) {
 	char *out_filename = malloc(filename_len + 5);
 	char *asm_filename = malloc(filename_len + 5);
 	sprintf(out_filename, "%s.out", argv[1]);
-	sprintf(asm_filename, "%s.s", argv[1]);
+	sprintf(asm_filename, "%s.asm", argv[1]);
 
 	FILE *quads_file = fopen(out_filename, "w");
 	free(out_filename);

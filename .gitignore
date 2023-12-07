@@ -12,7 +12,6 @@ parser.c
 testexec
 *.o
 *.asm
-*.s
 
 #debugger files
 counterexamples

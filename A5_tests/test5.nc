@@ -1,11 +1,11 @@
 int d = 99;
 
+// had to move fun2 up, since fun uses it, and declaration must occur before 
+// usage
 int * fun2(int b){
     int * e = 0;
     return e;
 }
-
-// had to bring one of the functions up for it to be valid
 
 int fun(int c){
     if(c%d == 0) return fun2(c);

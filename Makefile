@@ -16,9 +16,8 @@ fname=$(team)_A$(assignment)
 
 build: $(o)
 
-# TODO: write this according to spec
-# test: build
-# 	./$(o) < $(testfile)
+test: build
+	./runtests.sh
 
 $(o): $(fname)_translator.o $(fname).tab.o $(lx).o compiler.o
 	$(CC) -o $@ $^ $(CFLAGS)
@@ -46,6 +45,8 @@ clean:
 	rm -rf $(lx)*
 	rm -rf *.o
 	rm -rf $(fname).tab.*
+	rm -rf *.out
+	rm -rf *.asm
 	rm -rf test.s test.o test.out testexec
 
-.PHONY: default clean build lex
+.PHONY: default clean build lex test
