@@ -756,6 +756,7 @@ int main(int argc, const char *argv[]) {
 	size_t filename_len = strlen(argv[1]);
 	char *out_filename = malloc(filename_len + 5);
 	char *asm_filename = malloc(filename_len + 5);
+
 	sprintf(out_filename, "%s.out", argv[1]);
 	sprintf(asm_filename, argc == 2 ? "%s.asm" : "%s.s", argv[1]);
 
@@ -806,10 +807,12 @@ int main(int argc, const char *argv[]) {
 	}
 	free(asm_filename);
 
+	// write static data segment
 	WriteDataSeg(file);
 
 	// generate entry point, emit all global instructions
 	WriteEntryPoint(file);
+	// emit all remaining quads
 	WriteFunctions(file);
 
 	// GAS syntax requires ending the file with a newline, not EOF

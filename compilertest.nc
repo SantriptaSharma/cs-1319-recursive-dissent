@@ -79,3 +79,8 @@
 //     *num = 10;
 //     return a == 10 ? 0 : 1;
 // }
+int arr[10];
+
+int main() {
+	int local[5];
+}

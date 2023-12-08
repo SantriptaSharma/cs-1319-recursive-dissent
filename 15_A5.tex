@@ -1,5 +1,7 @@
 \documentclass{article}
 \usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage[margin=1in]{geometry}
 
 \title{CS1319: PLDI - Assignment 5}
 \author{Hrsh Venket \& Santripta Sharma}
@@ -11,6 +13,117 @@
 
 \maketitle 
 
+\section{System Information}
+The generated assembly code is valid for the GNU Assembler (as), for x86\_64 architectures (as such, we assume the existence of \verb|rxx| registers, and 8-byte addressing). The output has been generated on WSL-Debian 11, with the following properties (\verb|lscpu| output):
+\begin{verbatim}
+Architecture:                       x86_64
+CPU op-mode(s):                     32-bit, 64-bit
+Byte Order:                         Little Endian
+Address sizes:                      48 bits physical, 48 bits virtual
+\end{verbatim}
 
+\section{Test Cases}
+\begin{enumerate}
+	\item Test Case 1 doesn't compile, due to the lack of a main function, which our compiler discards as an invalid program by design. Augmenting the file with \verb|int main() {}| is sufficient to make it compile as expected.
+	\item Test Case 2 compiles correctly.
+	\item Test Case 3 compiles correctly, but will always segfault if the generated code is assembled and run, due to \verb|d| being initialised to \verb|0x0|, which causes a memory access to \verb|0x0| when it is dereferenced, causing a segfault. Simply setting \verb|d = &c| (or any other valid address) is sufficient for successful execution.
+	\item Test Case 4 does not compile correctly, due to the recursive call being to a non-existent function called \verb|sum| instead of \verb|fun|. Simply making this change causes it to compile and (if assembled) executes correctly.
+	\item Test Case 5 does not compile correctly, due to \verb|fun2| being declared \& defined after it is first used in \verb|fun|. Once this is rectified, by hoisting \verb|fun2| up, the file compiles and executes correctly.
+\end{enumerate}
+
+\subsection{Extra Credit}
+\begin{itemize}
+	\item Arrays have been implemented.
+\end{itemize}
+
+\section{Design of the Target Code Generator}
+\subsection{Modifications to the TAC Generator}{
+	\begin{enumerate}
+		\item Fixed the error causing void pointers to be disallowed, with the translator incorrectly assuming they were zero-sized.
+		\item Made every quad that could possibly be jumped to drop a label quad. This was accomplished by first making every marker non-terminal drop a label on reduction (using a global label\_counter), and dropping a label whenever a manual backpatch (not to a marker's address) was performed during any reduction.\bigskip
+		
+		This change makes it easier to spit out the assembly code in one pass, since this eliminates any need to backpatching-based jump schemes, since once we have the quads, we know exactly what labels will exist, and every jump statement points to a label before the "functional quad" it intends to jump to.
+	\end{enumerate}	
+}
+
+\subsection{Translation Scheme}{
+	The translator uses the simple macro-based translation scheme, not utilising any complex static analysis/optimisation. This is both easier to reason about in the short timeframe for the assignment and allows us to forgo a lot of bookkeeping. Another consequence of this is that during function prologues/epilogues, we do not need to worry about callee-saved/caller-saved registers, since the corresponding assembly for every quad assumes a garbage state at the beginning, and simply builds the state it needs to perform its operation from scratch every time. This is, of course, not optimal.
+}
+
+\subsection{Global Static Data}{
+	We begin by writing the data segment of the assembly file, by simply iterating through the global symbol table and using the assembler's directives to lay out our data segment. One key operation we perform in this part is renaming the \verb|main| function (which we refuse to compile without) to \verb|_main|, and overlay our own \verb|main| label into the file to act as the entry point for our program.
+}
+
+\subsection{Entry Point}{
+	Here, we find all blocks of external quads (quads not in any functions, caused by initialised declarations eg. \verb|int d = 32 * c + 5;|) and also all blocks of function quads as a side effect, storing them for later. Next, we translate all the external quads into assembly code, and write it into the entry point, after which we call \verb|main|.\bigskip
+
+	This choice means that any external quads, no matter where they are placed in the file, are evaluated before the \verb|_main| (or the actual \verb|main| function in the nanoC file) is ever run. Finally, after our call to \verb|main|, we setup the registers to perform the \verb|exit| syscall, using \verb|_main|'s return value (in \verb|%eax|) as our exit status code.
+}
+
+\subsection{Functions}{
+	Since we have the extents of all function blocks, all we have to do now is traverse through them, output their labels, prologues, translated function quad blocks, and epilogues.\bigskip
+	
+	For function activation records \& calling convention, we use the standard convention. The key difference is that we push our arguments in the same order as the declaration, instead of the commonly used reverse order:
+	\begin{center}
+		\begin{tabular}{c|c}
+			\textbf{rbp+} & \textbf{description}\\
+			\hline
+			-16... & param\_n (pushed by caller), other params above\\
+			-8 & saved rip (pushed by call instruction)\\
+			0 & saved rbp\\
+			-s... & local 1 (of size s), other locals below
+		\end{tabular}
+	\end{center}
+	\subsubsection{Activation Record Formula: Mapping from ST Offsets to Stack Offsets}{
+		One of the main tasks at this stage is to convert the abstract layout of parameters, temps, \& locals on the symbol table to locations in memory, based on an offset off of the \verb|rbp|. For this, we derive the following formulae:
+
+		\begin{align*}
+			\text{For any symbol } S,\ S_{start} = S_{off} + S_{size}\text{ where } S_{off} \text{ is the symbol table offset of } S\\
+			argstart := (P_n)_{start}, \text{ where } P_n \text{ is the first parameter.}\\
+		\end{align*}
+		\vspace*{-32px}
+		\begin{align*}
+			\text{For any parameter } P,\ P_{stk} = 2 \times sizeof(ptr) + (argstart - P_{start})\\
+			\text{Since the first term is the distance of the rbp to the last param's start (skipping rbp, rip)}\\ 
+			\text{and the second term is the distance from the last param's start to this param's start}\\
+			\text{Now, } argstart = (P_n)_{off} + (P_n)_{size} = \_\_retval_{off}\\
+			\Rightarrow P_{stk} = 2\times sizeof(ptr) + (\_\_retval_{off} - (P_{off} + P_{size}))\\
+			\\
+			\text{For any local } L,\ L_{stk} = \_\_retval_{start} - L_{start},\\
+			\text{ since this is simply the negative distance between the end of the "positive" stack and this symbol }\\
+			\Rightarrow L_{stk} = (\_\_retval_{size} + \_\_retval_{off}) - (L_{size} + L_{off})
+		\end{align*}
+
+		Essentially, \verb|__retval| acts as a stopgap between the two parts of the symbol table (params \& locals), so by simply storing information about it, we can calculate these offsets at any time. We store this information in the \verb|func_context| variable.\bigskip
+
+		Here's an example of this scheme in action:
+		\begin{center}
+			\begin{tabular}{c|c|c|c}
+				\textbf{off} & \textbf{size} & \textbf{sym} & \textbf{start}\\
+				\hline
+				0 & 4 & a & 4\\
+				4 & 8 & b & 12\\
+				12 & 4 & c & 16\\
+				16 & 4 & d & 20\\
+				20 & 4 & ret & 24\\
+				24 & 8 & y & 32\\
+				32 & 4 & z & 36
+			\end{tabular}
+			\hspace*{40px}
+			\begin{tabular}{c|c|c}
+				\textbf{stk} & \textbf{size} & \textbf{sym}\\
+				\hline
+				32 & 4 & a\\
+				24 & 8 & b\\
+				20 & 4 & c\\
+				16 & 4 & d\\
+				8 & 8 & rip\\
+				0 & 8 & rbp\\
+				-8 & 8 & y\\
+				-12 & 4 & z
+			\end{tabular}
+		\end{center}
+	}
+}
 
 \end{document}
