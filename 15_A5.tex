@@ -122,6 +122,63 @@ Address sizes:                      48 bits physical, 48 bits virtual
 				-12 & 4 & z
 			\end{tabular}
 		\end{center}
+
+		Once all this set up is completed, all that remains is to iterate over all function quads and output their macros. Some considerations are made, such as choosing which variant of an instruction to use based on operand sizes or making sure there aren't more memory addresses in any instruction than it can handle (fixed by using an extra instruction to load the memory location into an intermediate register), or even making sure that the constant operand occurs first in \verb|cmp| instructions, but generally the rest of the translation is pretty straightforward, with some exceptions.
+	}
+	\subsubsection{The Exceptions}{
+		Most of the exceptions fall into the category of relying on traversing the array of quads to extract extra information that is not available to them. Here, we try to catalogue all such cases, and explain why it has (not really) to be this way.
+
+		\begin{enumerate}
+			\item \textbf{The ret Quad:} Simply put, each ret defines an exit point for the program, and we require the function epilogue to be executed at each exit point. However, we do not want to duplicate code to this extent, where we have to repeat the epilogue for each return. Therefore, when we first emit the epilogue for the function, we write a label to the asm file, \verb|_f__<function_name>_return_|.\bigskip
+			
+			Now, with this change, each \verb|ret| quad simply translates to an unconditional jump to this label.
+			\item \textbf{The call Quad:} A call quad looks like the following in our translator: \verb|call func, n|, where \verb|n| is the number of parameters that need to be provided to the call.\bigskip
+			
+			Now, in the TAC, the \verb|param sym| quad represents the pushing of \verb|sym| onto the stack, for a future call. However, at the time that the code generator sees these quads, we are not ready to push the given argument onto the stack, for the simple reason that we do not know what size the function expects this argument to be of. Consider the code:
+			\begin{verbatim}
+void fun(int *ptr) {
+    return ptr;
+}
+
+int main() {
+    int d = 3;
+    fun(d);
+    return 0;
+}
+			\end{verbatim}
+			Here, while \verb|fun| expects a pointer (8-bytes), we pass in an int (4-bytes). If we were simply to push the 4-byte integer onto the stack, we would mess up addressing for the function, invalidating the offsets we calculated for the activation record.\bigskip
+
+			For this reason, we defer the pushing of params to the \verb|call| quad, where we traverse up the quads array until we find \verb|n| param quads, and using the function's symbol table information (available in the \verb|call| quad), we can push the parameter onto the stack with the correct size.
+		
+			\item \textbf{Dereferenced Writes into Pointers:} Consider the following code:
+\begin{verbatim}
+int b = 0;
+
+int *c = &b;
+*c = 10;
+b = *c;
+\end{verbatim}
+			Here, at the end, we expect the value of \verb|b| to equal \verb|10|. Seems straightforward, but consider the translated TAC for this piece of code:
+\begin{verbatim}
+1: b = __t_0_
+2: _L_0_:
+3: __t_1_ = &b
+4: c = __t_1_
+5: _L_1_:
+6: deref__c = *c
+7: deref__c = __t_2_(10)
+8: _L_2_:
+9: deref__c = *c
+10: b = deref__c
+\end{verbatim}
+		With the way our translator works, the first time it sees a \verb|*<ptr_sym>| it generates a \verb|deref__<ptr_sym>| temporary symbol. This is then reused by any other dereferences of the same pointer symbol. This applies regardless of whether the dereference occurs on the LHS or the RHS of an assignment. This doesn't cause any problems in the RHS case (quad 8 onwards), but due to the special semantic meaning of a dereferenced write, when it occurs in the LHS (quads 5-7), we have to handle it separately.\bigskip
+
+		The translator outputs this write as a typical move quad, with the deref temporary symbol as the destination. Therefore, everytime we see a move quad, we check the prefix of the destination to see whether it is a deref temporary. If it is, a special procedure for deref writes takes over the code generation for this quad.\bigskip
+
+		How we go about the generation in this procedure is fairly straightforward, we know that since the LHS must also be reduced before the assignment is reduced, there must be a deref quad (like quads 6 \& 9) somewhere above us, with its destination also being the same deref temporary. We find this quad, by scanning the quads above us, and when we find this, we know that the source symbol for this quad is the pointer this deref symbol is sourced from.\bigskip
+
+		Once we have the pointer, we have the memory location, and can simply write our source symbol into that location, as a normal \verb|mov| quad does.
+		\end{enumerate}
 	}
 }
 

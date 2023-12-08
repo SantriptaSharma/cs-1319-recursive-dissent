@@ -548,7 +548,7 @@ static void TranslateQuad(int *i, FILE *file, SymbolTable *tab) {
 
 		case INDR:
 		case INDW:
-			// TODO:
+			// TODO: similar scheme as ptr write
 		break;
 
 		case PTRW:
